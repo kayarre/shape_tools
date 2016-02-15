@@ -1,5 +1,5 @@
 #pragma once
-#include "/Users/khairyk/VPCZ1_kk_share/c_code/shape_tools/include/utility.h"
+#include "utility.h"
 #include <stdio.h>
 #include <iostream>
 #include <string>
@@ -39,7 +39,7 @@ class spherical_mesh
 	bool _curv_calc;
 	// methods
 	
-	virtual void mesh_init()		// reading edge information for curvature calculation from file is specific to this class
+    void mesh_init()		// reading edge information for curvature calculation from file is specific to this class
 	{
 		// initialize arrays necessary for analytical calculation of derivatives
 		Xu = MatrixXd(this->n_points, 3);	// 3-vector of columns
@@ -65,9 +65,9 @@ class spherical_mesh
 		this->KGan = (double*)calloc(this->n_points,sizeof(double));
 		vN.resize(n_points);for(int i = 0;i<n_points;i++){vN[i].resize(3);vN[i][0] = 0.0;vN[i][1] = 0.0;vN[i][2] = 0.0;}
 		// initialize the tiangular mesh arrays
-		double A = 0.0;		// total surface area
-		double V = 0.0;		// total volume
-		double Vo= 0.0;		// volume of sphere of same surface area
+		//double A = 0.0;		// total surface area
+		//double V = 0.0;		// total volume
+		//double Vo= 0.0;		// volume of sphere of same surface area
 
 		this->sf = (double*)calloc(this->n_points,sizeof(double));
 		this->X = (double**)calloc(this->n_points,sizeof(double*));	
@@ -141,7 +141,7 @@ class spherical_mesh
 
 	void sfGen(const MatrixXd &xc) //// generate surface field based on the spherical harmonics coefficients in xc
 	{
-		int nc = (this->L_max + 1) *(this->L_max + 1);
+		//int nc = (this->L_max + 1) *(this->L_max + 1);
 		MatrixXd tmp(this->n_points,1);
 		tmp = this->YLK*xc;
 		for (int i = 0; i< this->n_points;i++){	this->sf[i] = tmp(i,0);}
@@ -151,7 +151,7 @@ class spherical_mesh
 		//// generate the X position vector for generation of triangular mesh
 	{
 		// calculate X
-		int nc = (this->L_max + 1) *(this->L_max + 1);
+		//int nc = (this->L_max + 1) *(this->L_max + 1);
 		Xu.col(0)= this->YLK*xc;
 		Xu.col(1)= this->YLK*yc;
 		Xu.col(2)= this->YLK*zc;
@@ -167,7 +167,7 @@ class spherical_mesh
 		//// generates first and higher derivative fields
 	{
 		// calculate X
-		int nc = (this->L_max + 1) *(this->L_max + 1);
+		//int nc = (this->L_max + 1) *(this->L_max + 1);
 		Xu.col(0)= this->YLK*xc;
 		Xu.col(1)= this->YLK*yc;
 		Xu.col(2)= this->YLK*zc;
@@ -1712,7 +1712,7 @@ public:
 		str = string(cstr);
 		std::string delim = "\t";
 		Tokenize(str, sf_tags, delim);
-		int nco = (this->b->L_max +1) * (this->b->L_max +1);		// this is the nc that we  need
+		//int nco = (this->b->L_max +1) * (this->b->L_max +1);		// this is the nc that we  need
 		int nc = (L+1) * (L+1);
 		this->xc.resize(nc,1);
 		this->yc.resize(nc,1);
@@ -2317,7 +2317,7 @@ public:
 		this->srf_u->sm->sfGen(this->Dc);	// generates the scalar field corresponding to the thickness
 
 		// generate the inner and outer planes
-		double fac = 10000;
+		//double fac = 10000;
 		int n_points = this->srf_u->sm->n_points;
 		Xin.resize(n_points);
 		Xout.resize(n_points);
@@ -2499,7 +2499,7 @@ public:
 		this->srf_m->update_tri();// Calculate the triangular mesh properties (importantly the normals in the double**n)
 		this->srf_m->sm->sfGen(this->Dc);	// generates the scalar field corresponding to the thickness
 		// generate the inner and outer planes
-		double fac = 10000;
+		//double fac = 10000;
 		int n_points = this->srf_m->sm->n_points;
 		Xin.resize(n_points);
 		Xout.resize(n_points);
@@ -2568,7 +2568,7 @@ public:
 		this->srf_m->update_tri();// Calculate the triangular mesh properties (importantly the normals in the double**n)
 		this->srf_m->sm->sfGen(this->Dc);	// generates the scalar field corresponding to the thickness
 		// generate the inner and outer planes
-		double fac = 10000;
+		//double fac = 10000;
 		int n_points = this->srf_m->sm->n_points;
 		for(int i=0;i<n_points;i++)
 		{

@@ -1,5 +1,9 @@
 #pragma once
+
+//////////////// modify to point to your local eigen library installation
 #include "/Users/khairyk/VPCZ1_kk_share/c_code/eigen-eigen-10219c95fe65/Eigen/Eigen"	// use Eigen library
+//#include "Eigen/Eigen"
+//#include "unsupported/Eigen/MatrixFunctions"
 #include "/Users/khairyk/VPCZ1_kk_share/c_code/eigen-eigen-10219c95fe65/unsupported/Eigen/MatrixFunctions"
 
 #include <iostream>
@@ -1018,7 +1022,7 @@ void tri_plane_intersect(std::vector< std::vector<double> >X, const std::vector<
 		double U0[3];
 		double U1[3];
 		double U2[3];
-		double fac = 100.0;
+		//double fac = 100.0;
 		int counter = 0;
 		// make a really big triangle
 		U0[0] = -LARGE; U0[1] = yval; U0[2] = -LARGE;
