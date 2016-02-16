@@ -1,16 +1,21 @@
 
-"shape_tools.h" and "utility.h" will only work if the Eigen library is available. Please see : 
-
-http://eigen.tuxfamily.org/
+"shape_tools.h" and "utility.h" will only work if the Eigen library is available. Please use:
+Eigen 3.1.1: http://eigen.tuxfamily.org
 
 for downloads and usage.
--------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
 
-"utility.h" should in general not be modified.
+Important: "utility.h": You have to modify the first two lines to include the path to your Eigen code library.
+
+--------------------------------------------------------------------------------------------------------------
+
+General information:
+
 "shape_tools.h" defines the following classes:
 spherical_mesh
 sh_basis
 shp_surface
 shp_shell  (under testing and being refactored ---- not needed for SHAPE)
------------ to use these classes just "include" the file "shape_tools.h" in your code.
+
+----------- to use these classes just "include" the file "shape_tools.h" in your application code.
 All function definitions are inline, so there is no need to link other files.
