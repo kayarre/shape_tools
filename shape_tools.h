@@ -1479,7 +1479,7 @@ public:
 		int old_nc = this->xc.rows();
 		if(old_L_max!=L)	// 
 		{
-			int new_nc = (L+1)*(L+1);
+			int new_nc = (L+1)*(L+1);  // new number of coefficients
 			// generate a new basis and delete the old one
 			sh_basis* tmp_b = this->b;
 			this->b = new sh_basis(L,dim);	// make a new basis
@@ -1493,9 +1493,9 @@ public:
 			// 
 			if(L>old_L_max)
 			{
-				tmp = this->xc;xc.resize(new_nc,1);xc.fill(0.0);for(int i=0;i<old_nc;i++){xc(i) = tmp(i);}
-				tmp = this->yc;yc.resize(new_nc,1);yc.fill(0.0);for(int i=0;i<old_nc;i++){yc(i) = tmp(i);}
-				tmp = this->zc;zc.resize(new_nc,1);zc.fill(0.0);for(int i=0;i<old_nc;i++){zc(i) = tmp(i);}
+				tmp = this->xc;xc.conservativeResize(new_nc,1);xc.fill(0.0);for(int i=0;i<old_nc;i++){xc(i) = tmp(i);}
+				tmp = this->yc;yc.conservativeResize(new_nc,1);yc.fill(0.0);for(int i=0;i<old_nc;i++){yc(i) = tmp(i);}
+				tmp = this->zc;zc.conservativeResize(new_nc,1);zc.fill(0.0);for(int i=0;i<old_nc;i++){zc(i) = tmp(i);}
 				this->sfmx.fill(0.0);
 				for(int r = 0;r<old_nc;r++)
 					for(int c = 0;c<tmp_sfmx.cols();c++)
@@ -1503,9 +1503,9 @@ public:
 			}
 			if(L<old_L_max)
 			{
-				tmp = this->xc;xc.resize(new_nc,1);xc.fill(0.0);for(int i=0;i<new_nc;i++){xc(i) = tmp(i);}
-				tmp = this->yc;yc.resize(new_nc,1);yc.fill(0.0);for(int i=0;i<new_nc;i++){yc(i) = tmp(i);}
-				tmp = this->zc;zc.resize(new_nc,1);zc.fill(0.0);for(int i=0;i<new_nc;i++){zc(i) = tmp(i);}
+				tmp = this->xc;xc.conservativeResize(new_nc,1);xc.fill(0.0);for(int i=0;i<new_nc;i++){xc(i) = tmp(i);}
+				tmp = this->yc;yc.conservativeResize(new_nc,1);yc.fill(0.0);for(int i=0;i<new_nc;i++){yc(i) = tmp(i);}
+				tmp = this->zc;zc.conservativeResize(new_nc,1);zc.fill(0.0);for(int i=0;i<new_nc;i++){zc(i) = tmp(i);}
 				for(int r = 0;r<new_nc;r++)
 					for(int c = 0;c<tmp_sfmx.cols();c++)
 					{this->sfmx(r,c) = tmp_sfmx(r,c);}
@@ -1530,15 +1530,15 @@ public:
 		delete tmp_b;		// free memory of the old basis;
 		if(L>old_L_max)
 		{
-			MatrixXd tmp = this->xc;xc.resize(new_nc,1);xc.fill(0.0);for(int i=0;i<old_nc;i++){xc(i) = tmp(i);}
-					 tmp = this->yc;yc.resize(new_nc,1);yc.fill(0.0);for(int i=0;i<old_nc;i++){yc(i) = tmp(i);}
-					 tmp = this->zc;zc.resize(new_nc,1);zc.fill(0.0);for(int i=0;i<old_nc;i++){zc(i) = tmp(i);}
+			MatrixXd tmp = this->xc;xc.conservativeResize(new_nc,1);xc.fill(0.0);for(int i=0;i<old_nc;i++){xc(i) = tmp(i);}
+					 tmp = this->yc;yc.conservativeResize(new_nc,1);yc.fill(0.0);for(int i=0;i<old_nc;i++){yc(i) = tmp(i);}
+					 tmp = this->zc;zc.conservativeResize(new_nc,1);zc.fill(0.0);for(int i=0;i<old_nc;i++){zc(i) = tmp(i);}
 		}
 		if(L<old_L_max)
 		{
-			 MatrixXd tmp = this->xc;xc.resize(new_nc,1);xc.fill(0.0);for(int i=0;i<new_nc;i++){xc(i) = tmp(i);}
-					  tmp = this->yc;yc.resize(new_nc,1);yc.fill(0.0);for(int i=0;i<new_nc;i++){yc(i) = tmp(i);}
-					  tmp = this->zc;zc.resize(new_nc,1);zc.fill(0.0);for(int i=0;i<new_nc;i++){zc(i) = tmp(i);}
+			 MatrixXd tmp = this->xc;xc.conservativeResize(new_nc,1);xc.fill(0.0);for(int i=0;i<new_nc;i++){xc(i) = tmp(i);}
+					  tmp = this->yc;yc.conservativeResize(new_nc,1);yc.fill(0.0);for(int i=0;i<new_nc;i++){yc(i) = tmp(i);}
+					  tmp = this->zc;zc.conservativeResize(new_nc,1);zc.fill(0.0);for(int i=0;i<new_nc;i++){zc(i) = tmp(i);}
 		}
 		this->mx_init();
 		this->needsUpdating = YES;
