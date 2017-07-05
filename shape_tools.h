@@ -64,7 +64,7 @@ class spherical_mesh
 		this->Han = (double*)calloc(this->n_points,sizeof(double));
 		this->KGan = (double*)calloc(this->n_points,sizeof(double));
 		vN.resize(n_points);for(int i = 0;i<n_points;i++){vN[i].resize(3);vN[i][0] = 0.0;vN[i][1] = 0.0;vN[i][2] = 0.0;}
-		// initialize the tiangular mesh arrays
+		// initialize tiangular mesh arrays
 		//double A = 0.0;		// total surface area
 		//double V = 0.0;		// total volume
 		//double Vo= 0.0;		// volume of sphere of same surface area
@@ -93,7 +93,8 @@ class spherical_mesh
 		this->H = (double*)calloc(this->n_points,sizeof(double));
 		this->dA = (double*)calloc(this->n_points,sizeof(double));
 
-		/// prepare intermediate arrays of indices needed for curvature calculation (read from disk -- this is messy)
+		/// prepare intermediate arrays of indices needed for mesh-based
+        /// curvature calculation (read from disk -- this is messy)
 		_vip = (struct vertex_info *)(calloc(this->n_points,sizeof(struct vertex_info)));	//allocate memory for the vertex infos
 		int iReturn;
 		int *vr;		// indices of faces a verted is member of
@@ -147,8 +148,10 @@ class spherical_mesh
 		for (int i = 0; i< this->n_points;i++){	this->sf[i] = tmp(i,0);}
 		tmp.resize(0,0);
 	}
-	void surfaceGenX(const MatrixXd &xc, const MatrixXd &yc, const MatrixXd &zc) 
-		//// generate the X position vector for generation of triangular mesh
+	void surfaceGenX(const MatrixXd &xc, const MatrixXd &yc, const MatrixXd &zc)
+        //// Spherical harmonics-based generation of surface
+		//// generate X position vector for all points on triangular mesh
+        //// using a new set of coefficients (synthesis)
 	{
 		// calculate X
 		//int nc = (this->L_max + 1) *(this->L_max + 1);
@@ -162,9 +165,12 @@ class spherical_mesh
 				this->X[i][2] = Xu(i,2);
 		}
 	}
-	void surfaceGen(const MatrixXd &xc, const MatrixXd &yc, const MatrixXd &zc) 
-		//// generate the X position vector for generation of triangular mesh
-		//// generates first and higher derivative fields
+	void surfaceGen(const MatrixXd &xc, const MatrixXd &yc, const MatrixXd &zc)
+        //// Spherical harmonics-based generation of surface
+		//// generate the X position vector for all points on triangular mesh
+        //// using a new set of coefficients (synthesis)
+		//// generates first and higher derivatives (first and second funamental forms)
+        //// surface metric and normals
 	{
 		// calculate X
 		//int nc = (this->L_max + 1) *(this->L_max + 1);
@@ -207,14 +213,14 @@ class spherical_mesh
 		 this->F = (Xt.col(0).array())*(Xp.col(0).array()) +(Xt.col(1).array())*(Xp.col(1).array()) +(Xt.col(2).array())*(Xp.col(2).array()); 
 		 this->G = (Xp.col(0).array())*(Xp.col(0).array()) +(Xp.col(1).array())*(Xp.col(1).array()) +(Xp.col(2).array())*(Xp.col(2).array()); 
 //if(KKDEBUG){std::cout<<"E"<<std::endl<<"length: "<<E.rows()<<std::endl<<E<<std::endl;}
-		// Calculate  the surface metric and normal
+		// Calculate  surface metric and normals
 		this->SSn = (this->E.array()*this->G.array()-this->F.array()*this->F.array()).array().sqrt();	// the surface metric
 		this->nu.col(0) = (Xt.col(1).array()*Xp.col(2).array()-Xt.col(2).array()*Xp.col(1).array()).array()/SSn.array();
 		this->nu.col(1) = (Xt.col(2).array()*Xp.col(0).array()-Xt.col(0).array()*Xp.col(2).array()).array()/SSn.array();
 		this->nu.col(2) = (Xt.col(0).array()*Xp.col(1).array()-Xt.col(1).array()*Xp.col(0).array()).array()/SSn.array();
 
 		
-		// Calculate the second fundamental form
+		// Calculate second fundamental form
 		 this->L = (Xtt.col(0).array())*(nu.col(0).array()) +(Xtt.col(1).array())*(nu.col(1).array()) +(Xtt.col(2).array())*(nu.col(2).array());
 		 this->M = (Xtp.col(0).array())*(nu.col(0).array()) +(Xtp.col(1).array())*(nu.col(1).array()) +(Xtp.col(2).array())*(nu.col(2).array());
 		 this->N = (Xpp.col(0).array())*(nu.col(0).array()) +(Xpp.col(1).array())*(nu.col(1).array()) +(Xpp.col(2).array())*(nu.col(2).array());
