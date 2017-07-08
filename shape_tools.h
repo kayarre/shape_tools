@@ -11,911 +11,913 @@ using namespace std;
 #define NO 0
 #define KKDEBUG 1
 
+
+
 class spherical_mesh
 {
-	public:
-		// variables applicable to any triangular mesh
-	int tri_n;	// index of the spherical triangulation to use
-	int n_points, n_faces;
-	int *f0, *f1, *f2;
-	double* x1, *y1, *z1;
-	double* x2, *y2, *z2;
-	double* x3, *y3, *z3, *twoA;
-	double **X;				// actual surface 3-vector columns come in here
-	double **q, **r, **crossqpr, **n;
-	double *H, *dA;
-	double A, V, v, Eb, h;
-	double *sf;		// store the scalar field n_points x 1 array
-	std::vector< std::vector<double> > vN;	// normal at vertex
-
-	//member variables specific for the mesh being spherical at initialization and being used in conjuction with shp_surface
-	int L_max;
-	MatrixXd p,t;	// column matrices 
-	MatrixXd YLK,Y_P, Y_T, Y_TT, Y_PP, Y_TP;	// basis matrix
-	MatrixXd Xu, Xt, Xp, Xtt, Xpp, Xtp, E, F, G, L, M, N, nu,SSn, dXn, Hu, KGu;
-	double *Han, *KGan;	// local mean curvature and local Gaussian curvature --- analytically evaluated 
+public:
+    // variables applicable to any triangular mesh
+    int tri_n;	// index of the spherical triangulation to use
+    int n_points, n_faces;
+    int *f0, *f1, *f2;
+    double* x1, *y1, *z1;
+    double* x2, *y2, *z2;
+    double* x3, *y3, *z3, *twoA;
+    double **X;				// actual surface 3-vector columns come in here
+    double **q, **r, **crossqpr, **n;
+    double *H, *dA;
+    double A, V, v, Eb, h;
+    double *sf;		// store the scalar field n_points x 1 array
+    std::vector< std::vector<double> > vN;	// normal at vertex
+    
+    //member variables specific for the mesh being spherical at initialization and being used in conjuction with shp_surface
+    int L_max;
+    MatrixXd p,t;	// column matrices
+    MatrixXd YLK,Y_P, Y_T, Y_TT, Y_PP, Y_TP;	// basis matrix
+    MatrixXd Xu, Xt, Xp, Xtt, Xpp, Xtp, E, F, G, L, M, N, nu,SSn, dXn, Hu, KGu;
+    double *Han, *KGan;	// local mean curvature and local Gaussian curvature --- analytically evaluated
     std::string fn_str;	//filename with mesh information
-	vertex_info* _vip;	//pointer to array of vertex_info structs;
-	bool _curv_calc;
-	// methods
-	
+    vertex_info* _vip;	//pointer to array of vertex_info structs;
+    bool _curv_calc;
+    // methods
+    
     void mesh_init()		// reading edge information for curvature calculation from file is specific to this class
-	{
-		// initialize arrays necessary for analytical calculation of derivatives
-		Xu = MatrixXd(this->n_points, 3);	// 3-vector of columns
-		Xt = MatrixXd(this->n_points, 3);	// 3-vector of columns
-		Xp = MatrixXd(this->n_points, 3);	// 3-vector of columns
-		Xtt = MatrixXd(this->n_points, 3);	// 3-vector of columns
-		Xpp = MatrixXd(this->n_points, 3);	// 3-vector of columns
-		Xtp = MatrixXd(this->n_points, 3);	// 3-vector of columns
-
-		E = MatrixXd(this->n_points, 1);	// 1-vector 
-		F = MatrixXd(this->n_points, 1);	// 1-vector 
-		G = MatrixXd(this->n_points, 1);	// 1-vector 
-		L = MatrixXd(this->n_points, 1);	// 1-vector 
-		M = MatrixXd(this->n_points, 1);	// 1-vector 
-		N = MatrixXd(this->n_points, 1);	// 1-vector 
-
-		SSn = MatrixXd(this->n_points, 1);	// 1-vector 
-		nu = MatrixXd(this->n_points, 3);	// 3-vector of columns resulting from the cross product of Xt and Xp
-
-		Hu = MatrixXd(this->n_points, 1);	// 1-vector 
-		KGu = MatrixXd(this->n_points, 1);	// 1-vector 
-		this->Han = (double*)calloc(this->n_points,sizeof(double));
-		this->KGan = (double*)calloc(this->n_points,sizeof(double));
-		vN.resize(n_points);for(int i = 0;i<n_points;i++){vN[i].resize(3);vN[i][0] = 0.0;vN[i][1] = 0.0;vN[i][2] = 0.0;}
-		// initialize tiangular mesh arrays
-		//double A = 0.0;		// total surface area
-		//double V = 0.0;		// total volume
-		//double Vo= 0.0;		// volume of sphere of same surface area
-
-		this->sf = (double*)calloc(this->n_points,sizeof(double));
-		this->X = (double**)calloc(this->n_points,sizeof(double*));	
-		for(int i=0;i<this->n_points;i++){X[i] = (double*)calloc(3,sizeof(double));}
-		///////////////////////////////////////
-		this->x1 = (double*)calloc(this->n_faces,sizeof(double));	
-		this->y1 = (double*)calloc(this->n_faces,sizeof(double));	
-		this->z1 = (double*)calloc(this->n_faces,sizeof(double));	
-		this->x2 = (double*)calloc(this->n_faces,sizeof(double));	
-		this->y2 = (double*)calloc(this->n_faces,sizeof(double));	
-		this->z2 = (double*)calloc(this->n_faces,sizeof(double));	
-		this->x3 = (double*)calloc(this->n_faces,sizeof(double));	
-		this->y3 = (double*)calloc(this->n_faces,sizeof(double));	
-		this->z3 = (double*)calloc(this->n_faces,sizeof(double));	
-		this->twoA = (double*)calloc(this->n_faces,sizeof(double));	//double the surface area of each triangle
-
-		this->q = (double**)calloc(this->n_faces,sizeof(double*));	for(int i=0;i<this->n_faces;i++){this->q[i] = (double*)calloc(3,sizeof(double));}
-		this->r = (double**)calloc(this->n_faces,sizeof(double*));	for(int i=0;i<this->n_faces;i++){this->r[i] = (double*)calloc(3,sizeof(double));}
-		this->crossqpr = (double**)calloc(this->n_faces,sizeof(double*));	for(int i=0;i<this->n_faces;i++){this->crossqpr[i] = (double*)calloc(3,sizeof(double));}
-		this->n = (double**)calloc(this->n_faces,sizeof(double*));	for(int i=0;i<this->n_faces;i++){this->n[i] = (double*)calloc(3,sizeof(double));}
-
-		/// initialize arrays specific to curvature and bending energy calculation
-		this->H = (double*)calloc(this->n_points,sizeof(double));
-		this->dA = (double*)calloc(this->n_points,sizeof(double));
-
-		/// prepare intermediate arrays of indices needed for mesh-based
+    {
+        // initialize arrays necessary for analytical calculation of derivatives
+        Xu = MatrixXd(this->n_points, 3);	// 3-vector of columns
+        Xt = MatrixXd(this->n_points, 3);	// 3-vector of columns
+        Xp = MatrixXd(this->n_points, 3);	// 3-vector of columns
+        Xtt = MatrixXd(this->n_points, 3);	// 3-vector of columns
+        Xpp = MatrixXd(this->n_points, 3);	// 3-vector of columns
+        Xtp = MatrixXd(this->n_points, 3);	// 3-vector of columns
+        
+        E = MatrixXd(this->n_points, 1);	// 1-vector
+        F = MatrixXd(this->n_points, 1);	// 1-vector
+        G = MatrixXd(this->n_points, 1);	// 1-vector
+        L = MatrixXd(this->n_points, 1);	// 1-vector
+        M = MatrixXd(this->n_points, 1);	// 1-vector
+        N = MatrixXd(this->n_points, 1);	// 1-vector
+        
+        SSn = MatrixXd(this->n_points, 1);	// 1-vector
+        nu = MatrixXd(this->n_points, 3);	// 3-vector of columns resulting from the cross product of Xt and Xp
+        
+        Hu = MatrixXd(this->n_points, 1);	// 1-vector
+        KGu = MatrixXd(this->n_points, 1);	// 1-vector
+        this->Han = (double*)calloc(this->n_points,sizeof(double));
+        this->KGan = (double*)calloc(this->n_points,sizeof(double));
+        vN.resize(n_points);for(int i = 0;i<n_points;i++){vN[i].resize(3);vN[i][0] = 0.0;vN[i][1] = 0.0;vN[i][2] = 0.0;}
+        // initialize tiangular mesh arrays
+        //double A = 0.0;		// total surface area
+        //double V = 0.0;		// total volume
+        //double Vo= 0.0;		// volume of sphere of same surface area
+        
+        this->sf = (double*)calloc(this->n_points,sizeof(double));
+        this->X = (double**)calloc(this->n_points,sizeof(double*));
+        for(int i=0;i<this->n_points;i++){X[i] = (double*)calloc(3,sizeof(double));}
+        ///////////////////////////////////////
+        this->x1 = (double*)calloc(this->n_faces,sizeof(double));
+        this->y1 = (double*)calloc(this->n_faces,sizeof(double));
+        this->z1 = (double*)calloc(this->n_faces,sizeof(double));
+        this->x2 = (double*)calloc(this->n_faces,sizeof(double));
+        this->y2 = (double*)calloc(this->n_faces,sizeof(double));
+        this->z2 = (double*)calloc(this->n_faces,sizeof(double));
+        this->x3 = (double*)calloc(this->n_faces,sizeof(double));
+        this->y3 = (double*)calloc(this->n_faces,sizeof(double));
+        this->z3 = (double*)calloc(this->n_faces,sizeof(double));
+        this->twoA = (double*)calloc(this->n_faces,sizeof(double));	//double the surface area of each triangle
+        
+        this->q = (double**)calloc(this->n_faces,sizeof(double*));	for(int i=0;i<this->n_faces;i++){this->q[i] = (double*)calloc(3,sizeof(double));}
+        this->r = (double**)calloc(this->n_faces,sizeof(double*));	for(int i=0;i<this->n_faces;i++){this->r[i] = (double*)calloc(3,sizeof(double));}
+        this->crossqpr = (double**)calloc(this->n_faces,sizeof(double*));	for(int i=0;i<this->n_faces;i++){this->crossqpr[i] = (double*)calloc(3,sizeof(double));}
+        this->n = (double**)calloc(this->n_faces,sizeof(double*));	for(int i=0;i<this->n_faces;i++){this->n[i] = (double*)calloc(3,sizeof(double));}
+        
+        /// initialize arrays specific to curvature and bending energy calculation
+        this->H = (double*)calloc(this->n_points,sizeof(double));
+        this->dA = (double*)calloc(this->n_points,sizeof(double));
+        
+        /// prepare intermediate arrays of indices needed for mesh-based
         /// curvature calculation (read from disk -- this is messy)
-		_vip = (struct vertex_info *)(calloc(this->n_points,sizeof(struct vertex_info)));	//allocate memory for the vertex infos
-		int iReturn;
-		int *vr;		// indices of faces a verted is member of
-		int *indx;		// indices of other vertices a vertex is connected to
-		int *r1;
-		int *r2;
-		int *r3;
-		int vn;			//number of other vertices a vertex is connected to
-		FILE* f;
-		char fullFileName[500];	
-		int val2;
-		sprintf(fullFileName,"./%s",fn_str.c_str());//
-		f = fopen(fullFileName,"r");//
-		if(f!=NULL)
-		{
-			for (int ix=0;ix<this->n_points;ix++)
-			{	//loop over the number of vertices
-				iReturn = fscanf(f,"%d",&vn);//read in the number if edge/triangle members of the vertex	
-				vr = (int*)(calloc(vn,sizeof(int)));
-				r1 = (int*)(calloc(vn,sizeof(int)));
-				r2 = (int*)(calloc(vn,sizeof(int)));
-				r3 = (int*)(calloc(vn,sizeof(int)));				
-				indx = (int*)(calloc(vn,sizeof(int)));
-				for(int rix = 0;rix<vn;rix++)
-				{
-					iReturn = fscanf(f,"%d\t",&val2);//read in the values for r
-					vr[rix] = val2-1;
-				}
-
-				for(int rix = 0;rix<vn;rix++)
-				{
-					iReturn = fscanf(f,"%d\t%d\t%d\t%d",&(indx[rix]),&(r1[rix]), &(r2[rix]), &(r3[rix]));//read in the values for Ve r1 r2
-					indx[rix]-=1;r1[rix]-=1;r2[rix]-=1;r3[rix]-=1;
-				}
-				_vip[ix] = vertex_info(vn,vr,indx,r1,r2, r3);
-			}
-			fclose(f);
-			_curv_calc = true;
-		}else
-		{
-			if(KKDEBUG){std::cout<<"Could not initialize curvature information for curvature calculation from triangular mesh"<<std::endl;}
-			_curv_calc = false;
-		}
-	}
-
-	void sfGen(const MatrixXd &xc) //// generate surface field based on the spherical harmonics coefficients in xc
-	{
-		//int nc = (this->L_max + 1) *(this->L_max + 1);
-		MatrixXd tmp(this->n_points,1);
-		tmp = this->YLK*xc;
-		for (int i = 0; i< this->n_points;i++){	this->sf[i] = tmp(i,0);}
-		tmp.resize(0,0);
-	}
-	void surfaceGenX(const MatrixXd &xc, const MatrixXd &yc, const MatrixXd &zc)
-        //// Spherical harmonics-based generation of surface
-		//// generate X position vector for all points on triangular mesh
-        //// using a new set of coefficients (synthesis)
-	{
-		// calculate X
-		//int nc = (this->L_max + 1) *(this->L_max + 1);
-		Xu.col(0)= this->YLK*xc;
-		Xu.col(1)= this->YLK*yc;
-		Xu.col(2)= this->YLK*zc;
-			for (int i = 0; i< this->n_points;i++)	// we copy to the double** X to read it from shape class which doesn't know about Eigen
-		{
-				this->X[i][0] = Xu(i,0);
-				this->X[i][1] = Xu(i,1);
-				this->X[i][2] = Xu(i,2);
-		}
-	}
-	void surfaceGen(const MatrixXd &xc, const MatrixXd &yc, const MatrixXd &zc)
-        //// Spherical harmonics-based generation of surface
-		//// generate the X position vector for all points on triangular mesh
-        //// using a new set of coefficients (synthesis)
-		//// generates first and higher derivatives (first and second funamental forms)
-        //// surface metric and normals
-	{
-		// calculate X
-		//int nc = (this->L_max + 1) *(this->L_max + 1);
-		Xu.col(0)= this->YLK*xc;
-		Xu.col(1)= this->YLK*yc;
-		Xu.col(2)= this->YLK*zc;
-		for (int i = 0; i< this->n_points;i++)	// we copy to the double** X to read it from shape class which doesn't know about Eigen
-		{
-				this->X[i][0] = Xu(i,0);
-				this->X[i][1] = Xu(i,1);
-				this->X[i][2] = Xu(i,2);
-		}
-		//
-		this->Xt.col(0) = this->Y_T*xc;
-		this->Xt.col(1) = this->Y_T*yc;
-		this->Xt.col(2) = this->Y_T*zc;
-//if(KKDEBUG){std::cout<<"Xt"<<std::endl<<"length: "<<Xt.rows()<<std::endl<<Xt<<std::endl;}
-		/// calculate Xp
-		this->Xp.col(0) = this->Y_P*xc;
-		this->Xp.col(1) = this->Y_P*yc;
-		this->Xp.col(2) = this->Y_P*zc;
-//if(KKDEBUG){std::cout<<"Xp"<<std::endl<<"length: "<<Xp.rows()<<std::endl<<Xp<<std::endl;}
-		/// calculate Xpp
-		this->Xpp.col(0) = this->Y_PP*xc;
-		this->Xpp.col(1) = this->Y_PP*yc;
-		this->Xpp.col(2) = this->Y_PP*zc;
-//if(KKDEBUG){std::cout<<"Xpp"<<std::endl<<"length: "<<Xpp.rows()<<std::endl<<Xpp<<std::endl;}
-		/// calculate Xtt
-		this->Xtt.col(0) = this->Y_TT*xc;
-		this->Xtt.col(1) = this->Y_TT*yc;
-		this->Xtt.col(2) = this->Y_TT*zc;
-//if(KKDEBUG){std::cout<<"Xtt"<<std::endl<<"length: "<<Xtt.rows()<<std::endl<<Xtt<<std::endl;}
-		/// calculate Xtp
-		this->Xtp.col(0) = this->Y_TP*xc;
-		this->Xtp.col(1) = this->Y_TP*yc;
-		this->Xtp.col(2) = this->Y_TP*zc;
-//if(KKDEBUG){std::cout<<"Xtp"<<std::endl<<"length: "<<Xtp.rows()<<std::endl<<Xtp<<std::endl;}
-		// Calculate first fundamental form
-		 this->E = (Xt.col(0).array())*(Xt.col(0).array()) +(Xt.col(1).array())*(Xt.col(1).array()) +(Xt.col(2).array())*(Xt.col(2).array()); 
-		 this->F = (Xt.col(0).array())*(Xp.col(0).array()) +(Xt.col(1).array())*(Xp.col(1).array()) +(Xt.col(2).array())*(Xp.col(2).array()); 
-		 this->G = (Xp.col(0).array())*(Xp.col(0).array()) +(Xp.col(1).array())*(Xp.col(1).array()) +(Xp.col(2).array())*(Xp.col(2).array()); 
-//if(KKDEBUG){std::cout<<"E"<<std::endl<<"length: "<<E.rows()<<std::endl<<E<<std::endl;}
-		// Calculate  surface metric and normals
-		this->SSn = (this->E.array()*this->G.array()-this->F.array()*this->F.array()).array().sqrt();	// the surface metric
-		this->nu.col(0) = (Xt.col(1).array()*Xp.col(2).array()-Xt.col(2).array()*Xp.col(1).array()).array()/SSn.array();
-		this->nu.col(1) = (Xt.col(2).array()*Xp.col(0).array()-Xt.col(0).array()*Xp.col(2).array()).array()/SSn.array();
-		this->nu.col(2) = (Xt.col(0).array()*Xp.col(1).array()-Xt.col(1).array()*Xp.col(0).array()).array()/SSn.array();
-
-		
-		// Calculate second fundamental form
-		 this->L = (Xtt.col(0).array())*(nu.col(0).array()) +(Xtt.col(1).array())*(nu.col(1).array()) +(Xtt.col(2).array())*(nu.col(2).array());
-		 this->M = (Xtp.col(0).array())*(nu.col(0).array()) +(Xtp.col(1).array())*(nu.col(1).array()) +(Xtp.col(2).array())*(nu.col(2).array());
-		 this->N = (Xpp.col(0).array())*(nu.col(0).array()) +(Xpp.col(1).array())*(nu.col(1).array()) +(Xpp.col(2).array())*(nu.col(2).array());
-
-		// Evaluate geometrical properties
-		this->Hu = -(E.array()*N.array() + G.array()*L.array() - 2*F.array()*M.array()).array()/(2 * (E.array()*G.array()-F.array()*F.array()).array());
-		this->KGu = (L.array()*N.array() - M.array()*M.array()).array()/(E.array()*G.array()-F.array()*F.array()).array();
-		// copy Hu and KGu to double** arrays
-		for (int i = 0; i< this->n_points;i++)	// we copy to the double** to read it from shape class which doesn't know about Eigen
-		{
-				this->Han[i] = Hu(i,0);
-				this->KGan[i] = KGu(i,0);
-		}
-	}
-	void surfaceGen(int coordix, int cix, double old_val, double new_val) 
-		//// generate the X position vector for generation of triangular mesh
-		//// generates first and higher derivative fields
-	{
-		/// calculate X
-		this->Xu.col(coordix) = this->Xu.col(coordix)-(this->YLK.col(cix) * old_val);	// subtract the effect of the basis vector
-		this->Xu.col(coordix) = this->Xu.col(coordix)+(this->YLK.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
-		for (int i = 0; i< this->n_points;i++)	// we copy to the double** X to read it from shape class which doesn't know about Eigen
-		{
-				this->X[i][0] = Xu(i,0);
-				this->X[i][1] = Xu(i,1);
-				this->X[i][2] = Xu(i,2);
-		}
-		//
-		/// calculate Xt
-		this->Xt.col(coordix) = this->Xt.col(coordix)-(this->Y_T.col(cix) * old_val);	// subtract the effect of the basis vector
-		this->Xt.col(coordix) = this->Xt.col(coordix)+(this->Y_T.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
-		/// calculate Xp
-		this->Xp.col(coordix) = this->Xp.col(coordix)-(this->Y_P.col(cix) * old_val);	// subtract the effect of the basis vector
-		this->Xp.col(coordix) = this->Xp.col(coordix)+(this->Y_P.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
-		/// calculate Xpp
-		this->Xpp.col(coordix) = this->Xpp.col(coordix)-(this->Y_PP.col(cix) * old_val);	// subtract the effect of the basis vector
-		this->Xpp.col(coordix) = this->Xpp.col(coordix)+(this->Y_PP.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
-		/// calculate Xtt
-		this->Xtt.col(coordix) = this->Xtt.col(coordix)-(this->Y_TT.col(cix) * old_val);	// subtract the effect of the basis vector
-		this->Xtt.col(coordix) = this->Xtt.col(coordix)+(this->Y_TT.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
-		/// calculate Xtp
-		this->Xtp.col(coordix) = this->Xtp.col(coordix)-(this->Y_TP.col(cix) * old_val);	// subtract the effect of the basis vector
-		this->Xtp.col(coordix) = this->Xtp.col(coordix)+(this->Y_TP.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
-		
-//if(KKDEBUG){std::cout<<"Xtp"<<std::endl<<"length: "<<Xtp.rows()<<std::endl<<Xtp<<std::endl;}
-		// Calculate first fundamental form
-		 this->E = (Xt.col(0).array())*(Xt.col(0).array()) +(Xt.col(1).array())*(Xt.col(1).array()) +(Xt.col(2).array())*(Xt.col(2).array()); 
-		 this->F = (Xt.col(0).array())*(Xp.col(0).array()) +(Xt.col(1).array())*(Xp.col(1).array()) +(Xt.col(2).array())*(Xp.col(2).array()); 
-		 this->G = (Xp.col(0).array())*(Xp.col(0).array()) +(Xp.col(1).array())*(Xp.col(1).array()) +(Xp.col(2).array())*(Xp.col(2).array()); 
-//if(KKDEBUG){std::cout<<"E"<<std::endl<<"length: "<<E.rows()<<std::endl<<E<<std::endl;}
-		// Calculate  the surface metric and normal
-		this->SSn = (this->E.array()*this->G.array()-this->F.array()*this->F.array()).array().sqrt();	// the surface metric
-		this->nu.col(0) = (Xt.col(1).array()*Xp.col(2).array()-Xt.col(2).array()*Xp.col(1).array()).array()/SSn.array();
-		this->nu.col(1) = (Xt.col(2).array()*Xp.col(0).array()-Xt.col(0).array()*Xp.col(2).array()).array()/SSn.array();
-		this->nu.col(2) = (Xt.col(0).array()*Xp.col(1).array()-Xt.col(1).array()*Xp.col(0).array()).array()/SSn.array();
-
-		
-		// Calculate the second fundamental form
-		 this->L = (Xtt.col(0).array())*(nu.col(0).array()) +(Xtt.col(1).array())*(nu.col(1).array()) +(Xtt.col(2).array())*(nu.col(2).array());
-		 this->M = (Xtp.col(0).array())*(nu.col(0).array()) +(Xtp.col(1).array())*(nu.col(1).array()) +(Xtp.col(2).array())*(nu.col(2).array());
-		 this->N = (Xpp.col(0).array())*(nu.col(0).array()) +(Xpp.col(1).array())*(nu.col(1).array()) +(Xpp.col(2).array())*(nu.col(2).array());
-
-		// Evaluate geometrical properties
-		this->Hu = -(E.array()*N.array() + G.array()*L.array() - 2*F.array()*M.array()).array()/(2 * (E.array()*G.array()-F.array()*F.array()).array());
-		this->KGu = (L.array()*N.array() - M.array()*M.array()).array()/(E.array()*G.array()-F.array()*F.array()).array();
-		// copy Hu and KGu to double** arrays
-		for (int i = 0; i< this->n_points;i++)	// we copy to the double** to read it from shape class which doesn't know about Eigen
-		{
-				this->Han[i] = Hu(i,0);
-				this->KGan[i] = KGu(i,0);
-		}
-	}
-	void update_tri()
-	{ 
-		// calculates geometric properties based on Frank Julicher's PhD thesis appendix b
-		this->A = 0.0;
-		this->V = 0.0;
-		// written out in full for readability
-		for(int i = 0;i<this->n_faces;i++)
-		{		//loop over the faces
-		x1[i] = X[f0[i]-1][0];
-		y1[i] = X[f0[i]-1][1];
-		z1[i] = X[f0[i]-1][2];
-		x2[i] = X[f1[i]-1][0];
-		y2[i] = X[f1[i]-1][1];
-		z2[i] = X[f1[i]-1][2];
-		x3[i] = X[f2[i]-1][0];
-		y3[i] = X[f2[i]-1][1];
-		z3[i] = X[f2[i]-1][2];
-		q[i][0] = x2[i]-x1[i];q[i][1]=y2[i]-y1[i];q[i][2]=z2[i]-z1[i];
-		r[i][0] = x3[i]-x1[i];r[i][1]=y3[i]-y1[i];r[i][2]=z3[i]-z1[i];
-		//take the cross product
-		crossqpr[i][0]= (q[i][1]*r[i][2])-(q[i][2]*r[i][1]);
-		crossqpr[i][1]= (q[i][2]*r[i][0])-(q[i][0]*r[i][2]);
-		crossqpr[i][2]= (q[i][0]*r[i][1])-(q[i][1]*r[i][0]);
-		twoA[i]= sqrt((crossqpr[i][0])*(crossqpr[i][0])+(crossqpr[i][1])*(crossqpr[i][1])+(crossqpr[i][2])*(crossqpr[i][2]));
-		A+=twoA[i]/2;	// accumulate the areas of surface triangles
-		//normalized surface normal vector
-		n[i][0] =crossqpr[i][0]/twoA[i]; n[i][1] =crossqpr[i][1]/twoA[i];n[i][2] =crossqpr[i][2]/twoA[i];
-		
-		V+=-1.0/3.0*(n[i][0]*x1[i] + n[i][1]*y1[i]+ n[i][2]*z1[i])*twoA[i]/2.0;
-		}
-		double Vo = 4.0/3.0*PI*sqrt((A/4.0/PI)*(A/4.0/PI)*(A/4.0/PI));
-		this->A = std::abs(this->A);
-		this->V = std::abs(this->V);
-		this->v = std::abs(this->V/Vo);
-
-		Eb = 0.0;		//initialize bending energy
-		h =  0.0;		//initialize total curvature
-	if(_curv_calc)
-	{
-	// Let's calculate the curvatures at all vertices
-	// this calculation heavily relies on precalculated quantities
-	// that are generated with the matlabl file output triangulated props.m
-	// this information is loaded into memory when reading mesh_info.txt.
-	// variable meanings are similar to the matlab file.
-		double theta,Lij = 0.0;
-		int nm;		//number of member triangles
-		double* n1;
-		double* n2;    // working normals
-		int *rr;
-		int *indx;
-		int *r1;
-		int *r2;
-		int *r3;
-		double Va[3];
-		double Ve[3];
-		double Vfar[3];
-		double P1;
-		//double dA[_gdim];	//surface area associated with each vertex
-		Eb = 0.0;		//initialize bending energy
-		h =  0.0;		//initialize total curvature
-
-		for(int ix=0;ix<this->n_points;ix++)// loop over the vertices
-		{		
-			dA[ix] = 0.0;		
-			H[ix] = 0.0;
-			vN[ix][0] = 0.0;
-			vN[ix][1] = 0.0;
-			vN[ix][2] = 0.0;
-			Va[0] = X[ix][0];Va[1] = X[ix][1];Va[2] = X[ix][2];
-			nm = _vip[ix].n;		
-			rr   = _vip[ix].r;
-			indx = _vip[ix].indx;
-			r1   = _vip[ix].r1;
-			r2   = _vip[ix].r2;
-			r3   = _vip[ix].r3;
-			
-			for(int rix=0;rix<nm;rix++)	//loop over edges
-			{	
-				// Calculate the surface normal at this vertex
-				this->vN[ix][0] += n[rr[rix]][0]/nm;
-				this->vN[ix][1] += n[rr[rix]][1]/nm;
-				this->vN[ix][2] += n[rr[rix]][2]/nm;
-
-				// Calculate the curvature
-				Ve[0] = X[indx[rix]][0];
-				Ve[1] = X[indx[rix]][1];
-				Ve[2] = X[indx[rix]][2];
-				Vfar[0] = X[r3[rix]][0];Vfar[1] = X[r3[rix]][1];Vfar[2] = X[r3[rix]][2];
-				Lij = sqrt(  (Va[0]-Ve[0])*(Va[0]-Ve[0]) + (Va[1]-Ve[1])*(Va[1]-Ve[1]) + (Va[2]-Ve[2])*(Va[2]-Ve[2]) ) ;
-				n1 = n[r1[rix]];
-				n2 = n[r2[rix]];
-				theta = acos((n1[0]*n2[0] + n1[1]*n2[1]+ n1[2]*n2[2]));
-				P1 = -(n1[0]*Va[0]+n1[1]*Va[1]+n1[2]*Va[2]);
-				if ( ((n1[0]*Vfar[0]+n1[1]*Vfar[1]+n1[2]*Vfar[2])+P1)>=0 ){	H[ix]  += -Lij*theta/4;	}
-				else
-				{
-					H[ix]  += Lij*theta/4;	// in this case H is still actually H*dA
-				}
-				dA[ix] += twoA[rr[rix]]/2/3;
-			}
-	
-			h+=H[ix]/A;
-			Eb+=(2*H[ix]*H[ix]/dA[ix])/8/PI;
-			H[ix] = H[ix]/dA[ix];	// now we have the real H value
-		
-		}
-	}
-}
-
-	void tri_props(vector< vector<double> > XX, double &a, double &v)
-		// should be a static function. just calculates area and volume for some XX
-	{ 
-		// calculates geometric properties
-		 a = 0.0;
-		 v = 0.0;
-		// written out in full for readability
-		for(int i = 0;i<this->n_faces;i++)
-		{		//loop over the faces
-			x1[i] = XX[f0[i]-1][0];
-			y1[i] = XX[f0[i]-1][1];
-			z1[i] = XX[f0[i]-1][2];
-			x2[i] = XX[f1[i]-1][0];
-			y2[i] = XX[f1[i]-1][1];
-			z2[i] = XX[f1[i]-1][2];
-			x3[i] = XX[f2[i]-1][0];
-			y3[i] = XX[f2[i]-1][1];
-			z3[i] = XX[f2[i]-1][2];
-			q[i][0] = x2[i]-x1[i];q[i][1]=y2[i]-y1[i];q[i][2]=z2[i]-z1[i];
-			r[i][0] = x3[i]-x1[i];r[i][1]=y3[i]-y1[i];r[i][2]=z3[i]-z1[i];
-			//take the cross product
-			crossqpr[i][0]= (q[i][1]*r[i][2])-(q[i][2]*r[i][1]);
-			crossqpr[i][1]= (q[i][2]*r[i][0])-(q[i][0]*r[i][2]);
-			crossqpr[i][2]= (q[i][0]*r[i][1])-(q[i][1]*r[i][0]);
-			twoA[i]= sqrt((crossqpr[i][0])*(crossqpr[i][0])+(crossqpr[i][1])*(crossqpr[i][1])+(crossqpr[i][2])*(crossqpr[i][2]));
-			a+=twoA[i]/2;	// accumulate the areas of surface triangles
-
-			//normalized surface normal vector
-			n[i][0] =crossqpr[i][0]/twoA[i]; n[i][1] =crossqpr[i][1]/twoA[i];n[i][2] =crossqpr[i][2]/twoA[i];
-			
-			v+=-1.0/3.0*(n[i][0]*x1[i] + n[i][1]*y1[i]+ n[i][2]*z1[i])*twoA[i]/2.0;
-		}
-		a = std::abs(a);
-		v = std::abs(v);
-	}
-
-	int self_intersect()
-	{
-		double* V0;
-		double* V1;
-		double* V2;
-		double* U0;
-		double* U1;
-		double* U2;
-		for(int i = 0;i<this->n_faces-1;i++)
-		{
-			V0 = (X[int(this->f0[i]-1)]);
-			V1 = (X[int(this->f1[i]-1)]);
-			V2 = (X[int(this->f2[i]-1)]);
-			for(int j = i+1;j<this->n_faces;j++)
-			{
-				U0 = (X[int(this->f0[j]-1)]);
-				U1 = (X[int(this->f1[j]-1)]);
-				U2 = (X[int(this->f2[j]-1)]);
-				if(tri_tri_intersect(V0,V1,V2,U0,U1,U2))
-				{
-					int sv = share_vert((this->f0[i]-1),(this->f1[i]-1),(this->f2[i]-1),(this->f0[j]-1),(this->f1[j]-1),(this->f2[j]-1));
-					if(sv==0)
-					{
-						return 1;
-					}
-				}
-			}
-		}
-		return 0;
-	}
-	// constructor
-	spherical_mesh(int L = 6, int ix = 2)
-	{
-		L_max = L;
-		_curv_calc = true;
-		tri_n = ix;
-		if (tri_n == 1)
-		{
-			fn_str = "ico2.tri";
-			n_points = 162;
-			n_faces  = 320;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_01,p);
-			t.resize(n_points,1);d2eig(THETA_01,t);
-			f0 = F0_01;
-			f1 = F1_01;
-			f2 = F2_01;
-		}
-		if (tri_n == 2)
-		{
-			fn_str = "ico3.tri";
-			n_points = 642;
-			n_faces  = 1280;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_02,p);
-			t.resize(n_points,1);d2eig(THETA_02,t);
-			f0 = F0_02;
-			f1 = F1_02;
-			f2 = F2_02;
-		}
-
-		if (tri_n == 3)
-		{
-			fn_str = "uni900.tri";
-			n_points = 900;
-			n_faces  = 1796;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_03,p);
-			t.resize(n_points,1);d2eig(THETA_03,t);
-			f0 = F0_03;
-			f1 = F1_03;
-			f2 = F2_03;
-		}
-		if (tri_n == 4)
-		{
-			fn_str = "ico4.tri";
-			n_points = 2562;
-			n_faces  = 5120;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_04,p);
-			t.resize(n_points,1);d2eig(THETA_04,t);
-			f0 = F0_04;
-			f1 = F1_04;
-			f2 = F2_04;
-		}
-		if (tri_n == 5)
-		{
-			fn_str = "uni10k.tri";
-			n_points = 10000;
-			n_faces  = 19996;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_05,p);
-			t.resize(n_points,1);d2eig(THETA_05,t);
-			f0 = F0_05;
-			f1 = F1_05;
-			f2 = F2_05;
-		}
-		if (tri_n == 6)
-		{
-			fn_str = "ico5.tri";
-			n_points = 10242;
-			n_faces  = 20480;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_06,p);
-			t.resize(n_points,1);d2eig(THETA_06,t);
-			f0 = F0_06;
-			f1 = F1_06;
-			f2 = F2_06;
-		}
-		MatrixXd PLK, P_T;
-		ylk_cos_sin_bosh(L_max, p, t,YLK, PLK);
-		ylk_cos_sin_dphi_bosh(L_max, p, t, PLK, Y_P);
-		ylk_cos_sin_dphiphi_bosh(L_max, p, t, PLK, Y_PP);
-		ylk_cos_sin_dtheta_bosh(L_max, p, t, PLK, Y_T, P_T);
-		ylk_cos_sin_dthetaphi_bosh(L_max, p, t, PLK, P_T, Y_TP);
-		ylk_cos_sin_dthetatheta_bosh(L_max, p, t, P_T, Y_TT);
-
-		this->mesh_init();		// initialize arrays used to calculate surface properties
-		
-		// cleanup
-		PLK.resize(0,0);
-		P_T.resize(0,0);
-	}
-
-	spherical_mesh(const spherical_mesh& that)	// copy constructor
-	{
-		L_max = that.L_max;
-		_curv_calc = true;
-		tri_n = that.tri_n;
-		if (tri_n == 1)
-		{
-			fn_str = "ico2.tri";
-			n_points = 162;
-			n_faces  = 320;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_01,p);
-			t.resize(n_points,1);d2eig(THETA_01,t);
-			f0 = F0_01;
-			f1 = F1_01;
-			f2 = F2_01;
-		}
-		if (tri_n == 2)
-		{
-			fn_str = "ico3.tri";
-			n_points = 642;
-			n_faces  = 1280;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_02,p);
-			t.resize(n_points,1);d2eig(THETA_02,t);
-			f0 = F0_02;
-			f1 = F1_02;
-			f2 = F2_02;
-		}
-
-		if (tri_n == 3)
-		{
-			fn_str = "uni900.tri";
-			n_points = 900;
-			n_faces  = 1796;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_03,p);
-			t.resize(n_points,1);d2eig(THETA_03,t);
-			f0 = F0_03;
-			f1 = F1_03;
-			f2 = F2_03;
-		}
-		if (tri_n == 4)
-		{
-			fn_str = "ico4.tri";
-			n_points = 2562;
-			n_faces  = 5120;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_04,p);
-			t.resize(n_points,1);d2eig(THETA_04,t);
-			f0 = F0_04;
-			f1 = F1_04;
-			f2 = F2_04;
-		}
-		if (tri_n == 5)
-		{
-			fn_str = "uni10k.tri";
-			n_points = 10000;
-			n_faces  = 19996;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_05,p);
-			t.resize(n_points,1);d2eig(THETA_05,t);
-			f0 = F0_05;
-			f1 = F1_05;
-			f2 = F2_05;
-		}
-		if (tri_n == 6)
-		{
-			fn_str = "ico5.tri";
-			n_points = 10242;
-			n_faces  = 20480;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_06,p);
-			t.resize(n_points,1);d2eig(THETA_06,t);
-			f0 = F0_06;
-			f1 = F1_06;
-			f2 = F2_06;
-		}
-		MatrixXd PLK, P_T;
-		ylk_cos_sin_bosh(L_max, p, t,YLK, PLK);
-		ylk_cos_sin_dphi_bosh(L_max, p, t, PLK, Y_P);
-		ylk_cos_sin_dphiphi_bosh(L_max, p, t, PLK, Y_PP);
-		ylk_cos_sin_dtheta_bosh(L_max, p, t, PLK, Y_T, P_T);
-		ylk_cos_sin_dthetaphi_bosh(L_max, p, t, PLK, P_T, Y_TP);
-		ylk_cos_sin_dthetatheta_bosh(L_max, p, t, P_T, Y_TT);
-		this->mesh_init();		// initialize arrays used to calculate surface properties
-		// cleanup
-		PLK.resize(0,0);
-		P_T.resize(0,0);
-
-	}
-	spherical_mesh& operator=(const spherical_mesh& that)	//copy assignment operator -- copies member variables and then initializes
-	{
-		L_max = that.L_max;
-		_curv_calc = true;
-		tri_n = that.tri_n;
-		if (tri_n == 1)
-		{
-			fn_str = "ico2.tri";
-			n_points = 162;
-			n_faces  = 320;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_01,p);
-			t.resize(n_points,1);d2eig(THETA_01,t);
-			f0 = F0_01;
-			f1 = F1_01;
-			f2 = F2_01;
-		}
-		if (tri_n == 2)
-		{
-			fn_str = "ico3.tri";
-			n_points = 642;
-			n_faces  = 1280;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_02,p);
-			t.resize(n_points,1);d2eig(THETA_02,t);
-			f0 = F0_02;
-			f1 = F1_02;
-			f2 = F2_02;
-		}
-
-		if (tri_n == 3)
-		{
-			fn_str = "uni900.tri";
-			n_points = 900;
-			n_faces  = 1796;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_03,p);
-			t.resize(n_points,1);d2eig(THETA_03,t);
-			f0 = F0_03;
-			f1 = F1_03;
-			f2 = F2_03;
-		}
-		if (tri_n == 4)
-		{
-			fn_str = "ico4.tri";
-			n_points = 2562;
-			n_faces  = 5120;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_04,p);
-			t.resize(n_points,1);d2eig(THETA_04,t);
-			f0 = F0_04;
-			f1 = F1_04;
-			f2 = F2_04;
-		}
-		if (tri_n == 5)
-		{
-			fn_str = "uni10k.tri";
-			n_points = 10000;
-			n_faces  = 19996;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_05,p);
-			t.resize(n_points,1);d2eig(THETA_05,t);
-			f0 = F0_05;
-			f1 = F1_05;
-			f2 = F2_05;
-		}
-		if (tri_n == 6)
-		{
-			fn_str = "ico5.tri";
-			n_points = 10242;
-			n_faces  = 20480;
-			// calculate the basis matrix and import the faces for the visualization
-			p.resize(n_points,1);d2eig(PHI_06,p);
-			t.resize(n_points,1);d2eig(THETA_06,t);
-			f0 = F0_06;
-			f1 = F1_06;
-			f2 = F2_06;
-		}
-		MatrixXd PLK, P_T;
-		ylk_cos_sin_bosh(L_max, p, t,YLK, PLK);
-		ylk_cos_sin_dphi_bosh(L_max, p, t, PLK, Y_P);
-		ylk_cos_sin_dphiphi_bosh(L_max, p, t, PLK, Y_PP);
-		ylk_cos_sin_dtheta_bosh(L_max, p, t, PLK, Y_T, P_T);
-		ylk_cos_sin_dthetaphi_bosh(L_max, p, t, PLK, P_T, Y_TP);
-		ylk_cos_sin_dthetatheta_bosh(L_max, p, t, P_T, Y_TT);
-
-		this->mesh_init();		// initialize arrays used to calculate surface properties
-		// cleanup
-		PLK.resize(0,0);
-		P_T.resize(0,0);
-
-		return *this;
-
-	}
-	~spherical_mesh()		// destructor
-	{
-		this->p.resize(0,0);
-		this->t.resize(0,0);
-		this->YLK.resize(0,0);
-		this->Y_P.resize(0,0);
-		this->Y_T.resize(0,0);
-		this->Y_TT.resize(0,0);
-		this->Y_PP.resize(0,0);
-		this->Y_TP.resize(0,0);
-		this->Xu.resize(0,0);
-		this->Xt.resize(0,0);
-		this->Xp.resize(0,0);
-		this->Xtt.resize(0,0);
-		this->Xtp.resize(0,0);
-		this->Xpp.resize(0,0);
-		this->E.resize(0,0);
-		this->F.resize(0,0);
-		this->G.resize(0,0);
-		this->L.resize(0,0);
-		this->M.resize(0,0);
-		this->N.resize(0,0);
-		this->nu.resize(0,0);
-		this->SSn.resize(0,0);
-		this->dXn.resize(0,0);
-		this->Hu.resize(0,0);
-		this->KGu.resize(0,0);
-
-		free(this->sf);
-		free(this->X);
-		free(this->H);
-		free(this->Han);
-		free(this->KGan);
-		free(this->dA);
-		free(this->_vip);
-		free(this->q);
-		free(this->r);
-		free(this->crossqpr);
-		free(this->n);
-		free(this->twoA);
-		free(this->x1);
-		free(this->y1);
-		free(this->z1);
-		free(this->x2);
-		free(this->y2);
-		free(this->z2);
-		free(this->x3);
-		free(this->y3);
-		free(this->z3);
-	}
-
-	public:
-	ostream& disp(ostream& os, const spherical_mesh& b)
-	{
-		/**/
-		os<<"L_max: "<<b.L_max<<std::endl;
-		os<<"Dimensions: "<<std::endl;
-		os<<"YLK: "<<b.YLK.rows()<<" x "<<b.YLK.cols()<<std::endl;
-		os<<"n_points: "<<b.n_points<<std::endl;
-		os<<"n_faces: "<<b.n_faces<<std::endl;
-		return os;
-	};
-
-	friend ostream& operator<<(ostream& os, const spherical_mesh& s)
-	{
-		
-		os<<s.tri_n<<std::endl;
-		os<<s.L_max<<std::endl;
-		//
-		return os;
-	};
-
-
-	friend istream& operator>>(istream& in, spherical_mesh& s)
-	{
-		in>>s.tri_n;
-		in>>s.L_max;
-		// initialize accordingly
-		s._curv_calc = true;
-		if (s.tri_n == 1)
-		{
-			s.fn_str = "ico2.tri";
-			s.n_points = 162;
-			s.n_faces  = 320;
-			// calculate the basis matrix and import the faces for the visualization
-			s.p.resize(s.n_points,1);d2eig(PHI_01,s.p);
-			s.t.resize(s.n_points,1);d2eig(THETA_01,s.t);
-			s.f0 = F0_01;
-			s.f1 = F1_01;
-			s.f2 = F2_01;
-		}
-		if (s.tri_n == 2)
-		{
-			s.fn_str = "ico3.tri";
-			s.n_points = 642;
-			s.n_faces  = 1280;
-			// calculate the basis matrix and import the faces for the visualization
-			s.p.resize(s.n_points,1);d2eig(PHI_02,s.p);
-			s.t.resize(s.n_points,1);d2eig(THETA_02,s.t);
-			s.f0 = F0_02;
-			s.f1 = F1_02;
-			s.f2 = F2_02;
-		}
-
-		if (s.tri_n == 3)
-		{
-			s.fn_str = "uni900.tri";
-			s.n_points = 900;
-			s.n_faces  = 1796;
-			// calculate the basis matrix and import the faces for the visualization
-			s.p.resize(s.n_points,1);d2eig(PHI_03,s.p);
-			s.t.resize(s.n_points,1);d2eig(THETA_03,s.t);
-			s.f0 = F0_03;
-			s.f1 = F1_03;
-			s.f2 = F2_03;
-		}
-		if (s.tri_n == 4)
-		{
-			s.fn_str = "ico4.tri";
-			s.n_points = 2562;
-			s.n_faces  = 5120;
-			// calculate the basis matrix and import the faces for the visualization
-			s.p.resize(s.n_points,1);d2eig(PHI_04,s.p);
-			s.t.resize(s.n_points,1);d2eig(THETA_04,s.t);
-			s.f0 = F0_04;
-			s.f1 = F1_04;
-			s.f2 = F2_04;
-		}
-		if (s.tri_n == 5)
-		{
-			s.fn_str = "uni10k.tri";
-			s.n_points = 10000;
-			s.n_faces  = 19996;
-			// calculate the basis matrix and import the faces for the visualization
-			s.p.resize(s.n_points,1);d2eig(PHI_05,s.p);
-			s.t.resize(s.n_points,1);d2eig(THETA_05,s.t);
-			s.f0 = F0_05;
-			s.f1 = F1_05;
-			s.f2 = F2_05;
-		}
-		if (s.tri_n == 6)
-		{
-			s.fn_str = "ico5.tri";
-			s.n_points = 10242;
-			s.n_faces  = 20480;
-			// calculate the basis matrix and import the faces for the visualization
-			s.p.resize(s.n_points,1);d2eig(PHI_06,s.p);
-			s.t.resize(s.n_points,1);d2eig(THETA_06,s.t);
-			s.f0 = F0_06;
-			s.f1 = F1_06;
-			s.f2 = F2_06;
-		}
-		MatrixXd PLK, P_T;
-		ylk_cos_sin_bosh(s.L_max, s.p, s.t,s.YLK, PLK);
-		ylk_cos_sin_dphi_bosh(s.L_max, s.p, s.t, PLK, s.Y_P);
-		ylk_cos_sin_dphiphi_bosh(s.L_max, s.p, s.t, PLK, s.Y_PP);
-		ylk_cos_sin_dtheta_bosh(s.L_max, s.p, s.t, PLK, s.Y_T, P_T);
-		ylk_cos_sin_dthetaphi_bosh(s.L_max, s.p, s.t, PLK, P_T, s.Y_TP);
-		ylk_cos_sin_dthetatheta_bosh(s.L_max, s.p, s.t, P_T, s.Y_TT);
-
-		s.mesh_init();		// initialize arrays used to calculate surface properties
-		s.update_tri();
-		// cleanup
-		PLK.resize(0,0);
-		P_T.resize(0,0);
-
-		//
-		return in;
-	};
+        _vip = (struct vertex_info *)(calloc(this->n_points,sizeof(struct vertex_info)));	//allocate memory for the vertex infos
+        int iReturn;
+        int *vr;		// indices of faces a verted is member of
+        int *indx;		// indices of other vertices a vertex is connected to
+        int *r1;
+        int *r2;
+        int *r3;
+        int vn;			//number of other vertices a vertex is connected to
+        FILE* f;
+        char fullFileName[500];
+        int val2;
+        sprintf(fullFileName,"./%s",fn_str.c_str());//
+        f = fopen(fullFileName,"r");//
+        if(f!=NULL)
+        {
+            for (int ix=0;ix<this->n_points;ix++)
+            {	//loop over the number of vertices
+                iReturn = fscanf(f,"%d",&vn);//read in the number if edge/triangle members of the vertex
+                vr = (int*)(calloc(vn,sizeof(int)));
+                r1 = (int*)(calloc(vn,sizeof(int)));
+                r2 = (int*)(calloc(vn,sizeof(int)));
+                r3 = (int*)(calloc(vn,sizeof(int)));
+                indx = (int*)(calloc(vn,sizeof(int)));
+                for(int rix = 0;rix<vn;rix++)
+                {
+                    iReturn = fscanf(f,"%d\t",&val2);//read in the values for r
+                    vr[rix] = val2-1;
+                }
+                
+                for(int rix = 0;rix<vn;rix++)
+                {
+                    iReturn = fscanf(f,"%d\t%d\t%d\t%d",&(indx[rix]),&(r1[rix]), &(r2[rix]), &(r3[rix]));//read in the values for Ve r1 r2
+                    indx[rix]-=1;r1[rix]-=1;r2[rix]-=1;r3[rix]-=1;
+                }
+                _vip[ix] = vertex_info(vn,vr,indx,r1,r2, r3);
+            }
+            fclose(f);
+            _curv_calc = true;
+        }else
+        {
+            if(KKDEBUG){std::cout<<"Could not initialize curvature information for curvature calculation from triangular mesh"<<std::endl;}
+            _curv_calc = false;
+        }
+    }
+    
+    void sfGen(const MatrixXd &xc) //// generate surface field based on the spherical harmonics coefficients in xc
+    {
+        //int nc = (this->L_max + 1) *(this->L_max + 1);
+        MatrixXd tmp(this->n_points,1);
+        tmp = this->YLK*xc;
+        for (int i = 0; i< this->n_points;i++){	this->sf[i] = tmp(i,0);}
+        tmp.resize(0,0);
+    }
+    void surfaceGenX(const MatrixXd &xc, const MatrixXd &yc, const MatrixXd &zc)
+    //// Spherical harmonics-based generation of surface
+    //// generate X position vector for all points on triangular mesh
+    //// using a new set of coefficients (synthesis)
+    {
+        // calculate X
+        //int nc = (this->L_max + 1) *(this->L_max + 1);
+        Xu.col(0)= this->YLK*xc;
+        Xu.col(1)= this->YLK*yc;
+        Xu.col(2)= this->YLK*zc;
+        for (int i = 0; i< this->n_points;i++)	// we copy to the double** X to read it from shape class which doesn't know about Eigen
+        {
+            this->X[i][0] = Xu(i,0);
+            this->X[i][1] = Xu(i,1);
+            this->X[i][2] = Xu(i,2);
+        }
+    }
+    void surfaceGen(const MatrixXd &xc, const MatrixXd &yc, const MatrixXd &zc)
+    //// Spherical harmonics-based generation of surface
+    //// generate the X position vector for all points on triangular mesh
+    //// using a new set of coefficients (synthesis)
+    //// generates first and higher derivatives (first and second funamental forms)
+    //// surface metric and normals
+    {
+        // calculate X
+        //int nc = (this->L_max + 1) *(this->L_max + 1);
+        Xu.col(0)= this->YLK*xc;
+        Xu.col(1)= this->YLK*yc;
+        Xu.col(2)= this->YLK*zc;
+        for (int i = 0; i< this->n_points;i++)	// we copy to double** X to read it from shape class which doesn't know about Eigen
+        {
+            this->X[i][0] = Xu(i,0);
+            this->X[i][1] = Xu(i,1);
+            this->X[i][2] = Xu(i,2);
+        }
+        //
+        this->Xt.col(0) = this->Y_T*xc;
+        this->Xt.col(1) = this->Y_T*yc;
+        this->Xt.col(2) = this->Y_T*zc;
+        //if(KKDEBUG){std::cout<<"Xt"<<std::endl<<"length: "<<Xt.rows()<<std::endl<<Xt<<std::endl;}
+        /// calculate Xp
+        this->Xp.col(0) = this->Y_P*xc;
+        this->Xp.col(1) = this->Y_P*yc;
+        this->Xp.col(2) = this->Y_P*zc;
+        //if(KKDEBUG){std::cout<<"Xp"<<std::endl<<"length: "<<Xp.rows()<<std::endl<<Xp<<std::endl;}
+        /// calculate Xpp
+        this->Xpp.col(0) = this->Y_PP*xc;
+        this->Xpp.col(1) = this->Y_PP*yc;
+        this->Xpp.col(2) = this->Y_PP*zc;
+        //if(KKDEBUG){std::cout<<"Xpp"<<std::endl<<"length: "<<Xpp.rows()<<std::endl<<Xpp<<std::endl;}
+        /// calculate Xtt
+        this->Xtt.col(0) = this->Y_TT*xc;
+        this->Xtt.col(1) = this->Y_TT*yc;
+        this->Xtt.col(2) = this->Y_TT*zc;
+        //if(KKDEBUG){std::cout<<"Xtt"<<std::endl<<"length: "<<Xtt.rows()<<std::endl<<Xtt<<std::endl;}
+        /// calculate Xtp
+        this->Xtp.col(0) = this->Y_TP*xc;
+        this->Xtp.col(1) = this->Y_TP*yc;
+        this->Xtp.col(2) = this->Y_TP*zc;
+        //if(KKDEBUG){std::cout<<"Xtp"<<std::endl<<"length: "<<Xtp.rows()<<std::endl<<Xtp<<std::endl;}
+        // Calculate first fundamental form
+        this->E = (Xt.col(0).array())*(Xt.col(0).array()) +(Xt.col(1).array())*(Xt.col(1).array()) +(Xt.col(2).array())*(Xt.col(2).array());
+        this->F = (Xt.col(0).array())*(Xp.col(0).array()) +(Xt.col(1).array())*(Xp.col(1).array()) +(Xt.col(2).array())*(Xp.col(2).array());
+        this->G = (Xp.col(0).array())*(Xp.col(0).array()) +(Xp.col(1).array())*(Xp.col(1).array()) +(Xp.col(2).array())*(Xp.col(2).array());
+        //if(KKDEBUG){std::cout<<"E"<<std::endl<<"length: "<<E.rows()<<std::endl<<E<<std::endl;}
+        // Calculate  surface metric and normals
+        this->SSn = (this->E.array()*this->G.array()-this->F.array()*this->F.array()).array().sqrt();	// the surface metric
+        this->nu.col(0) = (Xt.col(1).array()*Xp.col(2).array()-Xt.col(2).array()*Xp.col(1).array()).array()/SSn.array();
+        this->nu.col(1) = (Xt.col(2).array()*Xp.col(0).array()-Xt.col(0).array()*Xp.col(2).array()).array()/SSn.array();
+        this->nu.col(2) = (Xt.col(0).array()*Xp.col(1).array()-Xt.col(1).array()*Xp.col(0).array()).array()/SSn.array();
+        
+        
+        // Calculate second fundamental form
+        this->L = (Xtt.col(0).array())*(nu.col(0).array()) +(Xtt.col(1).array())*(nu.col(1).array()) +(Xtt.col(2).array())*(nu.col(2).array());
+        this->M = (Xtp.col(0).array())*(nu.col(0).array()) +(Xtp.col(1).array())*(nu.col(1).array()) +(Xtp.col(2).array())*(nu.col(2).array());
+        this->N = (Xpp.col(0).array())*(nu.col(0).array()) +(Xpp.col(1).array())*(nu.col(1).array()) +(Xpp.col(2).array())*(nu.col(2).array());
+        
+        // Evaluate geometrical properties
+        this->Hu = -(E.array()*N.array() + G.array()*L.array() - 2*F.array()*M.array()).array()/(2 * (E.array()*G.array()-F.array()*F.array()).array());
+        this->KGu = (L.array()*N.array() - M.array()*M.array()).array()/(E.array()*G.array()-F.array()*F.array()).array();
+        // copy Hu and KGu to double** arrays
+        for (int i = 0; i< this->n_points;i++)	// we copy to the double** to read it from shape class which doesn't know about Eigen
+        {
+            this->Han[i] = Hu(i,0);
+            this->KGan[i] = KGu(i,0);
+        }
+    }
+    void surfaceGen(int coordix, int cix, double old_val, double new_val)
+    //// generate the X position vector for generation of triangular mesh
+    //// generates first and higher derivative fields
+    {
+        /// calculate X
+        this->Xu.col(coordix) = this->Xu.col(coordix)-(this->YLK.col(cix) * old_val);	// subtract the effect of the basis vector
+        this->Xu.col(coordix) = this->Xu.col(coordix)+(this->YLK.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
+        for (int i = 0; i< this->n_points;i++)	// we copy to the double** X to read it from shape class which doesn't know about Eigen
+        {
+            this->X[i][0] = Xu(i,0);
+            this->X[i][1] = Xu(i,1);
+            this->X[i][2] = Xu(i,2);
+        }
+        //
+        /// calculate Xt
+        this->Xt.col(coordix) = this->Xt.col(coordix)-(this->Y_T.col(cix) * old_val);	// subtract the effect of the basis vector
+        this->Xt.col(coordix) = this->Xt.col(coordix)+(this->Y_T.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
+        /// calculate Xp
+        this->Xp.col(coordix) = this->Xp.col(coordix)-(this->Y_P.col(cix) * old_val);	// subtract the effect of the basis vector
+        this->Xp.col(coordix) = this->Xp.col(coordix)+(this->Y_P.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
+        /// calculate Xpp
+        this->Xpp.col(coordix) = this->Xpp.col(coordix)-(this->Y_PP.col(cix) * old_val);	// subtract the effect of the basis vector
+        this->Xpp.col(coordix) = this->Xpp.col(coordix)+(this->Y_PP.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
+        /// calculate Xtt
+        this->Xtt.col(coordix) = this->Xtt.col(coordix)-(this->Y_TT.col(cix) * old_val);	// subtract the effect of the basis vector
+        this->Xtt.col(coordix) = this->Xtt.col(coordix)+(this->Y_TT.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
+        /// calculate Xtp
+        this->Xtp.col(coordix) = this->Xtp.col(coordix)-(this->Y_TP.col(cix) * old_val);	// subtract the effect of the basis vector
+        this->Xtp.col(coordix) = this->Xtp.col(coordix)+(this->Y_TP.col(cix) * new_val);	// add the effect with the new value of the clk coefficient
+        
+        //if(KKDEBUG){std::cout<<"Xtp"<<std::endl<<"length: "<<Xtp.rows()<<std::endl<<Xtp<<std::endl;}
+        // Calculate first fundamental form
+        this->E = (Xt.col(0).array())*(Xt.col(0).array()) +(Xt.col(1).array())*(Xt.col(1).array()) +(Xt.col(2).array())*(Xt.col(2).array());
+        this->F = (Xt.col(0).array())*(Xp.col(0).array()) +(Xt.col(1).array())*(Xp.col(1).array()) +(Xt.col(2).array())*(Xp.col(2).array());
+        this->G = (Xp.col(0).array())*(Xp.col(0).array()) +(Xp.col(1).array())*(Xp.col(1).array()) +(Xp.col(2).array())*(Xp.col(2).array());
+        //if(KKDEBUG){std::cout<<"E"<<std::endl<<"length: "<<E.rows()<<std::endl<<E<<std::endl;}
+        // Calculate  the surface metric and normal
+        this->SSn = (this->E.array()*this->G.array()-this->F.array()*this->F.array()).array().sqrt();	// the surface metric
+        this->nu.col(0) = (Xt.col(1).array()*Xp.col(2).array()-Xt.col(2).array()*Xp.col(1).array()).array()/SSn.array();
+        this->nu.col(1) = (Xt.col(2).array()*Xp.col(0).array()-Xt.col(0).array()*Xp.col(2).array()).array()/SSn.array();
+        this->nu.col(2) = (Xt.col(0).array()*Xp.col(1).array()-Xt.col(1).array()*Xp.col(0).array()).array()/SSn.array();
+        
+        
+        // Calculate the second fundamental form
+        this->L = (Xtt.col(0).array())*(nu.col(0).array()) +(Xtt.col(1).array())*(nu.col(1).array()) +(Xtt.col(2).array())*(nu.col(2).array());
+        this->M = (Xtp.col(0).array())*(nu.col(0).array()) +(Xtp.col(1).array())*(nu.col(1).array()) +(Xtp.col(2).array())*(nu.col(2).array());
+        this->N = (Xpp.col(0).array())*(nu.col(0).array()) +(Xpp.col(1).array())*(nu.col(1).array()) +(Xpp.col(2).array())*(nu.col(2).array());
+        
+        // Evaluate geometrical properties
+        this->Hu = -(E.array()*N.array() + G.array()*L.array() - 2*F.array()*M.array()).array()/(2 * (E.array()*G.array()-F.array()*F.array()).array());
+        this->KGu = (L.array()*N.array() - M.array()*M.array()).array()/(E.array()*G.array()-F.array()*F.array()).array();
+        // copy Hu and KGu to double** arrays
+        for (int i = 0; i< this->n_points;i++)	// we copy to the double** to read it from shape class which doesn't know about Eigen
+        {
+            this->Han[i] = Hu(i,0);
+            this->KGan[i] = KGu(i,0);
+        }
+    }
+    void update_tri()
+    {
+        // calculates geometric properties based on Frank Julicher's PhD thesis appendix b
+        this->A = 0.0;
+        this->V = 0.0;
+        // written out in full for readability
+        for(int i = 0;i<this->n_faces;i++)
+        {		//loop over the faces
+            x1[i] = X[f0[i]-1][0];
+            y1[i] = X[f0[i]-1][1];
+            z1[i] = X[f0[i]-1][2];
+            x2[i] = X[f1[i]-1][0];
+            y2[i] = X[f1[i]-1][1];
+            z2[i] = X[f1[i]-1][2];
+            x3[i] = X[f2[i]-1][0];
+            y3[i] = X[f2[i]-1][1];
+            z3[i] = X[f2[i]-1][2];
+            q[i][0] = x2[i]-x1[i];q[i][1]=y2[i]-y1[i];q[i][2]=z2[i]-z1[i];
+            r[i][0] = x3[i]-x1[i];r[i][1]=y3[i]-y1[i];r[i][2]=z3[i]-z1[i];
+            //take the cross product
+            crossqpr[i][0]= (q[i][1]*r[i][2])-(q[i][2]*r[i][1]);
+            crossqpr[i][1]= (q[i][2]*r[i][0])-(q[i][0]*r[i][2]);
+            crossqpr[i][2]= (q[i][0]*r[i][1])-(q[i][1]*r[i][0]);
+            twoA[i]= sqrt((crossqpr[i][0])*(crossqpr[i][0])+(crossqpr[i][1])*(crossqpr[i][1])+(crossqpr[i][2])*(crossqpr[i][2]));
+            A+=twoA[i]/2;	// accumulate the areas of surface triangles
+            //normalized surface normal vector
+            n[i][0] =crossqpr[i][0]/twoA[i]; n[i][1] =crossqpr[i][1]/twoA[i];n[i][2] =crossqpr[i][2]/twoA[i];
+            
+            V+=-1.0/3.0*(n[i][0]*x1[i] + n[i][1]*y1[i]+ n[i][2]*z1[i])*twoA[i]/2.0;
+        }
+        double Vo = 4.0/3.0*PI*sqrt((A/4.0/PI)*(A/4.0/PI)*(A/4.0/PI));
+        this->A = std::abs(this->A);
+        this->V = std::abs(this->V);
+        this->v = std::abs(this->V/Vo);
+        
+        Eb = 0.0;		//initialize bending energy
+        h =  0.0;		//initialize total curvature
+        if(_curv_calc)
+        {
+            // Let's calculate the curvatures at all vertices
+            // this calculation heavily relies on precalculated quantities
+            // that are generated with the matlabl file output triangulated props.m
+            // this information is loaded into memory when reading mesh_info.txt.
+            // variable meanings are similar to the matlab file.
+            double theta,Lij = 0.0;
+            int nm;		//number of member triangles
+            double* n1;
+            double* n2;    // working normals
+            int *rr;
+            int *indx;
+            int *r1;
+            int *r2;
+            int *r3;
+            double Va[3];
+            double Ve[3];
+            double Vfar[3];
+            double P1;
+            //double dA[_gdim];	//surface area associated with each vertex
+            Eb = 0.0;		//initialize bending energy
+            h =  0.0;		//initialize total curvature
+            
+            for(int ix=0;ix<this->n_points;ix++)// loop over the vertices
+            {
+                dA[ix] = 0.0;
+                H[ix] = 0.0;
+                vN[ix][0] = 0.0;
+                vN[ix][1] = 0.0;
+                vN[ix][2] = 0.0;
+                Va[0] = X[ix][0];Va[1] = X[ix][1];Va[2] = X[ix][2];
+                nm = _vip[ix].n;
+                rr   = _vip[ix].r;
+                indx = _vip[ix].indx;
+                r1   = _vip[ix].r1;
+                r2   = _vip[ix].r2;
+                r3   = _vip[ix].r3;
+                
+                for(int rix=0;rix<nm;rix++)	//loop over edges
+                {
+                    // Calculate the surface normal at this vertex
+                    this->vN[ix][0] += n[rr[rix]][0]/nm;
+                    this->vN[ix][1] += n[rr[rix]][1]/nm;
+                    this->vN[ix][2] += n[rr[rix]][2]/nm;
+                    
+                    // Calculate the curvature
+                    Ve[0] = X[indx[rix]][0];
+                    Ve[1] = X[indx[rix]][1];
+                    Ve[2] = X[indx[rix]][2];
+                    Vfar[0] = X[r3[rix]][0];Vfar[1] = X[r3[rix]][1];Vfar[2] = X[r3[rix]][2];
+                    Lij = sqrt(  (Va[0]-Ve[0])*(Va[0]-Ve[0]) + (Va[1]-Ve[1])*(Va[1]-Ve[1]) + (Va[2]-Ve[2])*(Va[2]-Ve[2]) ) ;
+                    n1 = n[r1[rix]];
+                    n2 = n[r2[rix]];
+                    theta = acos((n1[0]*n2[0] + n1[1]*n2[1]+ n1[2]*n2[2]));
+                    P1 = -(n1[0]*Va[0]+n1[1]*Va[1]+n1[2]*Va[2]);
+                    if ( ((n1[0]*Vfar[0]+n1[1]*Vfar[1]+n1[2]*Vfar[2])+P1)>=0 ){	H[ix]  += -Lij*theta/4;	}
+                    else
+                    {
+                        H[ix]  += Lij*theta/4;	// in this case H is still actually H*dA
+                    }
+                    dA[ix] += twoA[rr[rix]]/2/3;
+                }
+                
+                h+=H[ix]/A;
+                Eb+=(2*H[ix]*H[ix]/dA[ix])/8/PI;
+                H[ix] = H[ix]/dA[ix];	// now we have the real H value
+                
+            }
+        }
+    }
+    
+    void tri_props(vector< vector<double> > XX, double &a, double &v)
+    // should be a static function. just calculates area and volume for some XX
+    {
+        // calculates geometric properties
+        a = 0.0;
+        v = 0.0;
+        // written out in full for readability
+        for(int i = 0;i<this->n_faces;i++)
+        {		//loop over the faces
+            x1[i] = XX[f0[i]-1][0];
+            y1[i] = XX[f0[i]-1][1];
+            z1[i] = XX[f0[i]-1][2];
+            x2[i] = XX[f1[i]-1][0];
+            y2[i] = XX[f1[i]-1][1];
+            z2[i] = XX[f1[i]-1][2];
+            x3[i] = XX[f2[i]-1][0];
+            y3[i] = XX[f2[i]-1][1];
+            z3[i] = XX[f2[i]-1][2];
+            q[i][0] = x2[i]-x1[i];q[i][1]=y2[i]-y1[i];q[i][2]=z2[i]-z1[i];
+            r[i][0] = x3[i]-x1[i];r[i][1]=y3[i]-y1[i];r[i][2]=z3[i]-z1[i];
+            //take the cross product
+            crossqpr[i][0]= (q[i][1]*r[i][2])-(q[i][2]*r[i][1]);
+            crossqpr[i][1]= (q[i][2]*r[i][0])-(q[i][0]*r[i][2]);
+            crossqpr[i][2]= (q[i][0]*r[i][1])-(q[i][1]*r[i][0]);
+            twoA[i]= sqrt((crossqpr[i][0])*(crossqpr[i][0])+(crossqpr[i][1])*(crossqpr[i][1])+(crossqpr[i][2])*(crossqpr[i][2]));
+            a+=twoA[i]/2;	// accumulate the areas of surface triangles
+            
+            //normalized surface normal vector
+            n[i][0] =crossqpr[i][0]/twoA[i]; n[i][1] =crossqpr[i][1]/twoA[i];n[i][2] =crossqpr[i][2]/twoA[i];
+            
+            v+=-1.0/3.0*(n[i][0]*x1[i] + n[i][1]*y1[i]+ n[i][2]*z1[i])*twoA[i]/2.0;
+        }
+        a = std::abs(a);
+        v = std::abs(v);
+    }
+    
+    int self_intersect()
+    {
+        double* V0;
+        double* V1;
+        double* V2;
+        double* U0;
+        double* U1;
+        double* U2;
+        for(int i = 0;i<this->n_faces-1;i++)
+        {
+            V0 = (X[int(this->f0[i]-1)]);
+            V1 = (X[int(this->f1[i]-1)]);
+            V2 = (X[int(this->f2[i]-1)]);
+            for(int j = i+1;j<this->n_faces;j++)
+            {
+                U0 = (X[int(this->f0[j]-1)]);
+                U1 = (X[int(this->f1[j]-1)]);
+                U2 = (X[int(this->f2[j]-1)]);
+                if(tri_tri_intersect(V0,V1,V2,U0,U1,U2))
+                {
+                    int sv = share_vert((this->f0[i]-1),(this->f1[i]-1),(this->f2[i]-1),(this->f0[j]-1),(this->f1[j]-1),(this->f2[j]-1));
+                    if(sv==0)
+                    {
+                        return 1;
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+    // constructor
+    spherical_mesh(int L = 6, int ix = 2)
+    {
+        L_max = L;
+        _curv_calc = true;
+        tri_n = ix;
+        if (tri_n == 1)
+        {
+            fn_str = "ico2.tri";
+            n_points = 162;
+            n_faces  = 320;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_01,p);
+            t.resize(n_points,1);d2eig(THETA_01,t);
+            f0 = F0_01;
+            f1 = F1_01;
+            f2 = F2_01;
+        }
+        if (tri_n == 2)
+        {
+            fn_str = "ico3.tri";
+            n_points = 642;
+            n_faces  = 1280;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_02,p);
+            t.resize(n_points,1);d2eig(THETA_02,t);
+            f0 = F0_02;
+            f1 = F1_02;
+            f2 = F2_02;
+        }
+        
+        if (tri_n == 3)
+        {
+            fn_str = "uni900.tri";
+            n_points = 900;
+            n_faces  = 1796;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_03,p);
+            t.resize(n_points,1);d2eig(THETA_03,t);
+            f0 = F0_03;
+            f1 = F1_03;
+            f2 = F2_03;
+        }
+        if (tri_n == 4)
+        {
+            fn_str = "ico4.tri";
+            n_points = 2562;
+            n_faces  = 5120;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_04,p);
+            t.resize(n_points,1);d2eig(THETA_04,t);
+            f0 = F0_04;
+            f1 = F1_04;
+            f2 = F2_04;
+        }
+        if (tri_n == 5)
+        {
+            fn_str = "uni10k.tri";
+            n_points = 10000;
+            n_faces  = 19996;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_05,p);
+            t.resize(n_points,1);d2eig(THETA_05,t);
+            f0 = F0_05;
+            f1 = F1_05;
+            f2 = F2_05;
+        }
+        if (tri_n == 6)
+        {
+            fn_str = "ico5.tri";
+            n_points = 10242;
+            n_faces  = 20480;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_06,p);
+            t.resize(n_points,1);d2eig(THETA_06,t);
+            f0 = F0_06;
+            f1 = F1_06;
+            f2 = F2_06;
+        }
+        MatrixXd PLK, P_T;
+        ylk_cos_sin_bosh(L_max, p, t,YLK, PLK);
+        ylk_cos_sin_dphi_bosh(L_max, p, t, PLK, Y_P);
+        ylk_cos_sin_dphiphi_bosh(L_max, p, t, PLK, Y_PP);
+        ylk_cos_sin_dtheta_bosh(L_max, p, t, PLK, Y_T, P_T);
+        ylk_cos_sin_dthetaphi_bosh(L_max, p, t, PLK, P_T, Y_TP);
+        ylk_cos_sin_dthetatheta_bosh(L_max, p, t, P_T, Y_TT);
+        
+        this->mesh_init();		// initialize arrays used to calculate surface properties
+        
+        // cleanup
+        PLK.resize(0,0);
+        P_T.resize(0,0);
+    }
+    
+    spherical_mesh(const spherical_mesh& that)	// copy constructor
+    {
+        L_max = that.L_max;
+        _curv_calc = true;
+        tri_n = that.tri_n;
+        if (tri_n == 1)
+        {
+            fn_str = "ico2.tri";
+            n_points = 162;
+            n_faces  = 320;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_01,p);
+            t.resize(n_points,1);d2eig(THETA_01,t);
+            f0 = F0_01;
+            f1 = F1_01;
+            f2 = F2_01;
+        }
+        if (tri_n == 2)
+        {
+            fn_str = "ico3.tri";
+            n_points = 642;
+            n_faces  = 1280;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_02,p);
+            t.resize(n_points,1);d2eig(THETA_02,t);
+            f0 = F0_02;
+            f1 = F1_02;
+            f2 = F2_02;
+        }
+        
+        if (tri_n == 3)
+        {
+            fn_str = "uni900.tri";
+            n_points = 900;
+            n_faces  = 1796;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_03,p);
+            t.resize(n_points,1);d2eig(THETA_03,t);
+            f0 = F0_03;
+            f1 = F1_03;
+            f2 = F2_03;
+        }
+        if (tri_n == 4)
+        {
+            fn_str = "ico4.tri";
+            n_points = 2562;
+            n_faces  = 5120;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_04,p);
+            t.resize(n_points,1);d2eig(THETA_04,t);
+            f0 = F0_04;
+            f1 = F1_04;
+            f2 = F2_04;
+        }
+        if (tri_n == 5)
+        {
+            fn_str = "uni10k.tri";
+            n_points = 10000;
+            n_faces  = 19996;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_05,p);
+            t.resize(n_points,1);d2eig(THETA_05,t);
+            f0 = F0_05;
+            f1 = F1_05;
+            f2 = F2_05;
+        }
+        if (tri_n == 6)
+        {
+            fn_str = "ico5.tri";
+            n_points = 10242;
+            n_faces  = 20480;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_06,p);
+            t.resize(n_points,1);d2eig(THETA_06,t);
+            f0 = F0_06;
+            f1 = F1_06;
+            f2 = F2_06;
+        }
+        MatrixXd PLK, P_T;
+        ylk_cos_sin_bosh(L_max, p, t,YLK, PLK);
+        ylk_cos_sin_dphi_bosh(L_max, p, t, PLK, Y_P);
+        ylk_cos_sin_dphiphi_bosh(L_max, p, t, PLK, Y_PP);
+        ylk_cos_sin_dtheta_bosh(L_max, p, t, PLK, Y_T, P_T);
+        ylk_cos_sin_dthetaphi_bosh(L_max, p, t, PLK, P_T, Y_TP);
+        ylk_cos_sin_dthetatheta_bosh(L_max, p, t, P_T, Y_TT);
+        this->mesh_init();		// initialize arrays used to calculate surface properties
+        // cleanup
+        PLK.resize(0,0);
+        P_T.resize(0,0);
+        
+    }
+    spherical_mesh& operator=(const spherical_mesh& that)	//copy assignment operator -- copies member variables and then initializes
+    {
+        L_max = that.L_max;
+        _curv_calc = true;
+        tri_n = that.tri_n;
+        if (tri_n == 1)
+        {
+            fn_str = "ico2.tri";
+            n_points = 162;
+            n_faces  = 320;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_01,p);
+            t.resize(n_points,1);d2eig(THETA_01,t);
+            f0 = F0_01;
+            f1 = F1_01;
+            f2 = F2_01;
+        }
+        if (tri_n == 2)
+        {
+            fn_str = "ico3.tri";
+            n_points = 642;
+            n_faces  = 1280;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_02,p);
+            t.resize(n_points,1);d2eig(THETA_02,t);
+            f0 = F0_02;
+            f1 = F1_02;
+            f2 = F2_02;
+        }
+        
+        if (tri_n == 3)
+        {
+            fn_str = "uni900.tri";
+            n_points = 900;
+            n_faces  = 1796;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_03,p);
+            t.resize(n_points,1);d2eig(THETA_03,t);
+            f0 = F0_03;
+            f1 = F1_03;
+            f2 = F2_03;
+        }
+        if (tri_n == 4)
+        {
+            fn_str = "ico4.tri";
+            n_points = 2562;
+            n_faces  = 5120;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_04,p);
+            t.resize(n_points,1);d2eig(THETA_04,t);
+            f0 = F0_04;
+            f1 = F1_04;
+            f2 = F2_04;
+        }
+        if (tri_n == 5)
+        {
+            fn_str = "uni10k.tri";
+            n_points = 10000;
+            n_faces  = 19996;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_05,p);
+            t.resize(n_points,1);d2eig(THETA_05,t);
+            f0 = F0_05;
+            f1 = F1_05;
+            f2 = F2_05;
+        }
+        if (tri_n == 6)
+        {
+            fn_str = "ico5.tri";
+            n_points = 10242;
+            n_faces  = 20480;
+            // calculate the basis matrix and import the faces for the visualization
+            p.resize(n_points,1);d2eig(PHI_06,p);
+            t.resize(n_points,1);d2eig(THETA_06,t);
+            f0 = F0_06;
+            f1 = F1_06;
+            f2 = F2_06;
+        }
+        MatrixXd PLK, P_T;
+        ylk_cos_sin_bosh(L_max, p, t,YLK, PLK);
+        ylk_cos_sin_dphi_bosh(L_max, p, t, PLK, Y_P);
+        ylk_cos_sin_dphiphi_bosh(L_max, p, t, PLK, Y_PP);
+        ylk_cos_sin_dtheta_bosh(L_max, p, t, PLK, Y_T, P_T);
+        ylk_cos_sin_dthetaphi_bosh(L_max, p, t, PLK, P_T, Y_TP);
+        ylk_cos_sin_dthetatheta_bosh(L_max, p, t, P_T, Y_TT);
+        
+        this->mesh_init();		// initialize arrays used to calculate surface properties
+        // cleanup
+        PLK.resize(0,0);
+        P_T.resize(0,0);
+        
+        return *this;
+        
+    }
+    ~spherical_mesh()		// destructor
+    {
+        this->p.resize(0,0);
+        this->t.resize(0,0);
+        this->YLK.resize(0,0);
+        this->Y_P.resize(0,0);
+        this->Y_T.resize(0,0);
+        this->Y_TT.resize(0,0);
+        this->Y_PP.resize(0,0);
+        this->Y_TP.resize(0,0);
+        this->Xu.resize(0,0);
+        this->Xt.resize(0,0);
+        this->Xp.resize(0,0);
+        this->Xtt.resize(0,0);
+        this->Xtp.resize(0,0);
+        this->Xpp.resize(0,0);
+        this->E.resize(0,0);
+        this->F.resize(0,0);
+        this->G.resize(0,0);
+        this->L.resize(0,0);
+        this->M.resize(0,0);
+        this->N.resize(0,0);
+        this->nu.resize(0,0);
+        this->SSn.resize(0,0);
+        this->dXn.resize(0,0);
+        this->Hu.resize(0,0);
+        this->KGu.resize(0,0);
+        
+        free(this->sf);
+        free(this->X);
+        free(this->H);
+        free(this->Han);
+        free(this->KGan);
+        free(this->dA);
+        free(this->_vip);
+        free(this->q);
+        free(this->r);
+        free(this->crossqpr);
+        free(this->n);
+        free(this->twoA);
+        free(this->x1);
+        free(this->y1);
+        free(this->z1);
+        free(this->x2);
+        free(this->y2);
+        free(this->z2);
+        free(this->x3);
+        free(this->y3);
+        free(this->z3);
+    }
+    
+public:
+    ostream& disp(ostream& os, const spherical_mesh& b)
+    {
+        /**/
+        os<<"L_max: "<<b.L_max<<std::endl;
+        os<<"Dimensions: "<<std::endl;
+        os<<"YLK: "<<b.YLK.rows()<<" x "<<b.YLK.cols()<<std::endl;
+        os<<"n_points: "<<b.n_points<<std::endl;
+        os<<"n_faces: "<<b.n_faces<<std::endl;
+        return os;
+    };
+    
+    friend ostream& operator<<(ostream& os, const spherical_mesh& s)
+    {
+        
+        os<<s.tri_n<<std::endl;
+        os<<s.L_max<<std::endl;
+        //
+        return os;
+    };
+    
+    
+    friend istream& operator>>(istream& in, spherical_mesh& s)
+    {
+        in>>s.tri_n;
+        in>>s.L_max;
+        // initialize accordingly
+        s._curv_calc = true;
+        if (s.tri_n == 1)
+        {
+            s.fn_str = "ico2.tri";
+            s.n_points = 162;
+            s.n_faces  = 320;
+            // calculate the basis matrix and import the faces for the visualization
+            s.p.resize(s.n_points,1);d2eig(PHI_01,s.p);
+            s.t.resize(s.n_points,1);d2eig(THETA_01,s.t);
+            s.f0 = F0_01;
+            s.f1 = F1_01;
+            s.f2 = F2_01;
+        }
+        if (s.tri_n == 2)
+        {
+            s.fn_str = "ico3.tri";
+            s.n_points = 642;
+            s.n_faces  = 1280;
+            // calculate the basis matrix and import the faces for the visualization
+            s.p.resize(s.n_points,1);d2eig(PHI_02,s.p);
+            s.t.resize(s.n_points,1);d2eig(THETA_02,s.t);
+            s.f0 = F0_02;
+            s.f1 = F1_02;
+            s.f2 = F2_02;
+        }
+        
+        if (s.tri_n == 3)
+        {
+            s.fn_str = "uni900.tri";
+            s.n_points = 900;
+            s.n_faces  = 1796;
+            // calculate the basis matrix and import the faces for the visualization
+            s.p.resize(s.n_points,1);d2eig(PHI_03,s.p);
+            s.t.resize(s.n_points,1);d2eig(THETA_03,s.t);
+            s.f0 = F0_03;
+            s.f1 = F1_03;
+            s.f2 = F2_03;
+        }
+        if (s.tri_n == 4)
+        {
+            s.fn_str = "ico4.tri";
+            s.n_points = 2562;
+            s.n_faces  = 5120;
+            // calculate the basis matrix and import the faces for the visualization
+            s.p.resize(s.n_points,1);d2eig(PHI_04,s.p);
+            s.t.resize(s.n_points,1);d2eig(THETA_04,s.t);
+            s.f0 = F0_04;
+            s.f1 = F1_04;
+            s.f2 = F2_04;
+        }
+        if (s.tri_n == 5)
+        {
+            s.fn_str = "uni10k.tri";
+            s.n_points = 10000;
+            s.n_faces  = 19996;
+            // calculate the basis matrix and import the faces for the visualization
+            s.p.resize(s.n_points,1);d2eig(PHI_05,s.p);
+            s.t.resize(s.n_points,1);d2eig(THETA_05,s.t);
+            s.f0 = F0_05;
+            s.f1 = F1_05;
+            s.f2 = F2_05;
+        }
+        if (s.tri_n == 6)
+        {
+            s.fn_str = "ico5.tri";
+            s.n_points = 10242;
+            s.n_faces  = 20480;
+            // calculate the basis matrix and import the faces for the visualization
+            s.p.resize(s.n_points,1);d2eig(PHI_06,s.p);
+            s.t.resize(s.n_points,1);d2eig(THETA_06,s.t);
+            s.f0 = F0_06;
+            s.f1 = F1_06;
+            s.f2 = F2_06;
+        }
+        MatrixXd PLK, P_T;
+        ylk_cos_sin_bosh(s.L_max, s.p, s.t,s.YLK, PLK);
+        ylk_cos_sin_dphi_bosh(s.L_max, s.p, s.t, PLK, s.Y_P);
+        ylk_cos_sin_dphiphi_bosh(s.L_max, s.p, s.t, PLK, s.Y_PP);
+        ylk_cos_sin_dtheta_bosh(s.L_max, s.p, s.t, PLK, s.Y_T, P_T);
+        ylk_cos_sin_dthetaphi_bosh(s.L_max, s.p, s.t, PLK, P_T, s.Y_TP);
+        ylk_cos_sin_dthetatheta_bosh(s.L_max, s.p, s.t, P_T, s.Y_TT);
+        
+        s.mesh_init();		// initialize arrays used to calculate surface properties
+        s.update_tri();
+        // cleanup
+        PLK.resize(0,0);
+        P_T.resize(0,0);
+        
+        //
+        return in;
+    };
 };
 
 
@@ -923,207 +925,218 @@ class spherical_mesh
 class sh_basis	// main basis class initializing to Gaussian quadrature weights and visualization basis
 {
 public:
-	int dim;
-	int L_max;
-	//member variables for Gaussian quadrature
-	MatrixXd p,t,wt,wp;	// column matrices holding the GA
-	MatrixXd phi, theta,w;
-	MatrixXd YLK, Y_P, Y_T, Y_TT, Y_PP, Y_TP;
-
-	// member variables for visualization only
-	//MatrixXd YLK_tri;
-
-	// constructor
-	sh_basis(int arg1 = 6, int arg2 = 30)
-	{
-		//replicate the basis generation code in matlab
-		dim = arg2;
-		L_max = arg1;
-		t.resize(dim,1);
-		wt.resize(dim,1);
-		p.resize(dim,1);
-		wp.resize(dim,1);
-		Eigen::MatrixXd wphi,wtheta, PLK,P_T;
-
-		// prepare the Gaussian base points and weights
-		gaussquad(0, PI, t, wt);	// generate the base points and weights for Gaussian quadrature
-		gaussquad(0, 2*PI, p, wp);	// generate the base points and weights for Gaussian quadrature
-		meshgrid(p, t, phi, theta);
-		meshgrid(wp, wt, wphi, wtheta);
-		reshape(wphi,wphi.rows()*wphi.cols(), 1);
-		reshape(wtheta,wtheta.rows()*wtheta.cols(), 1);
-		w = wphi.array() * wtheta.array();
-		// calculate the basis vectors and the derivatives and store them
-		ylk_cos_sin_bosh(L_max, phi, theta,YLK, PLK);
-		ylk_cos_sin_dphi_bosh(L_max, phi, theta, PLK, Y_P);
-		ylk_cos_sin_dphiphi_bosh(L_max, phi, theta, PLK, Y_PP);
-		ylk_cos_sin_dtheta_bosh(L_max, phi, theta, PLK, Y_T, P_T);
-		ylk_cos_sin_dthetaphi_bosh(L_max, phi, theta, PLK, P_T, Y_TP);
-		ylk_cos_sin_dthetatheta_bosh(L_max, phi, theta, P_T, Y_TT);
-		//cleanup
-		wphi.resize(0,0);
-		wtheta.resize(0,0);
-		PLK.resize(0,0);
-		P_T.resize(0,0);
-
-	}
-	sh_basis(const sh_basis& that)		// copy constructor
-	{
-		//replicate the basis generation code in matlab
-		dim = that.dim;
-		L_max = that.L_max;
-		t.resize(dim,1);
-		wt.resize(dim,1);
-		p.resize(dim,1);
-		wp.resize(dim,1);
-		Eigen::MatrixXd wphi,wtheta, PLK,P_T;
-
-		// prepare the Gaussian base points and weights
-		gaussquad(0, PI, t, wt);	// generate the base points and weights for Gaussian quadrature
-		gaussquad(0, 2*PI, p, wp);	// generate the base points and weights for Gaussian quadrature
-		meshgrid(p, t, phi, theta);
-		meshgrid(wp, wt, wphi, wtheta);
-		reshape(wphi,wphi.rows()*wphi.cols(), 1);
-		reshape(wtheta,wtheta.rows()*wtheta.cols(), 1);
-		w = wphi.array() * wtheta.array();
-		// calculate the basis vectors and the derivatives and store them
-		ylk_cos_sin_bosh(L_max, phi, theta,YLK, PLK);
-		ylk_cos_sin_dphi_bosh(L_max, phi, theta, PLK, Y_P);
-		ylk_cos_sin_dphiphi_bosh(L_max, phi, theta, PLK, Y_PP);
-		ylk_cos_sin_dtheta_bosh(L_max, phi, theta, PLK, Y_T, P_T);
-		ylk_cos_sin_dthetaphi_bosh(L_max, phi, theta, PLK, P_T, Y_TP);
-		ylk_cos_sin_dthetatheta_bosh(L_max, phi, theta, P_T, Y_TT);
-
-		//cleanup
-		wphi.resize(0,0);
-		wtheta.resize(0,0);
-		PLK.resize(0,0);
-		P_T.resize(0,0);
-
-	}
-	sh_basis& operator=(const sh_basis& that)	// copy assignment 
-	{
-		this->dim = that.dim;
-		this->L_max = that.L_max;
-		t.resize(dim,1);
-		wt.resize(dim,1);
-		p.resize(dim,1);
-		wp.resize(dim,1);
-		Eigen::MatrixXd wphi,wtheta, PLK,P_T;
-
-		// prepare the Gaussian base points and weights
-		gaussquad(0, PI, t, wt);	// generate the base points and weights for Gaussian quadrature
-		gaussquad(0, 2*PI, p, wp);	// generate the base points and weights for Gaussian quadrature
-		meshgrid(p, t, phi, theta);
-		meshgrid(wp, wt, wphi, wtheta);
-		reshape(wphi,wphi.rows()*wphi.cols(), 1);
-		reshape(wtheta,wtheta.rows()*wtheta.cols(), 1);
-		w = wphi.array() * wtheta.array();
-		// calculate the basis vectors and the derivatives, and store them
-		ylk_cos_sin_bosh(L_max, phi, theta,YLK, PLK);
-		ylk_cos_sin_dphi_bosh(L_max, phi, theta, PLK, Y_P);
-		ylk_cos_sin_dphiphi_bosh(L_max, phi, theta, PLK, Y_PP);
-		ylk_cos_sin_dtheta_bosh(L_max, phi, theta, PLK, Y_T, P_T);
-		ylk_cos_sin_dthetaphi_bosh(L_max, phi, theta, PLK, P_T, Y_TP);
-		ylk_cos_sin_dthetatheta_bosh(L_max, phi, theta, P_T, Y_TT);
-
-		//cleanup
-		wphi.resize(0,0);
-		wtheta.resize(0,0);
-		PLK.resize(0,0);
-		P_T.resize(0,0);
-		return *this;
-	}
-	~sh_basis()
-	{
-		p.resize(0,0);
-		t.resize(0,0);
-		wt.resize(0,0);
-		wp.resize(0,0);
-		phi.resize(0,0);
-		theta.resize(0,0);
-		w.resize(0,0);
-		YLK.resize(0,0);
-		Y_P.resize(0,0);
-		Y_T.resize(0,0);
-		Y_TT.resize(0,0);
-		Y_PP.resize(0,0);
-		Y_TP.resize(0,0);
-	};
-
-	public:
-		ostream& disp(ostream& os, const sh_basis& b)
-	{
-		/**/
-		os<<"L_max: "<<b.L_max<<std::endl;
-		os<<"dim  : "<<b.dim<<std::endl;
-		os<<"Dimensions: "<<std::endl;
-		os<<"			t: "<<b.t.rows()<<" x "<<b.t.cols()<<std::endl;
-		os<<"		theta: "<<b.theta.rows()<<" x "<<b.theta.cols()<<std::endl;
-		os<<"			p: "<<b.p.rows()<<" x "<<b.p.cols()<<std::endl;
-		os<<"		  phi: "<<b.phi.rows()<<" x "<<b.phi.cols()<<std::endl;
-		os<<"		   wt: "<<b.wt.rows()<<" x "<<b.wt.cols()<<std::endl;
-		os<<"		   wp: "<<b.wp.rows()<<" x "<<b.wp.cols()<<std::endl;
-		os<<"		    w: "<<b.w.rows()<<" x "<<b.w.cols()<<std::endl;
-		os<<"		   YLK: "<<b.YLK.rows()<<" x "<<b.YLK.cols()<<std::endl;
-		os<<"		   Y_P: "<<b.Y_P.rows()<<" x "<<b.Y_P.cols()<<std::endl;
-		os<<"		   Y_T: "<<b.Y_T.rows()<<" x "<<b.Y_T.cols()<<std::endl;
-		//os<<"	   YLK_tri: "<<b.YLK_tri.rows()<<" x "<<b.YLK_tri.cols()<<std::endl;
-		
-		return os;
-	};
-	friend ostream& operator<<(ostream& os, const sh_basis& s)
-	{
-		
-		os<<s.dim<<std::endl;
-		os<<s.L_max<<std::endl;
-		//
-		return os;
-	};
-
-
-	friend istream& operator>>(istream& in, sh_basis& s)
-	{
-		in>>s.dim;
-		in>>s.L_max;
-		// initialize accordingly
-		s.t.resize(s.dim,1);
-		s.wt.resize(s.dim,1);
-		s.p.resize(s.dim,1);
-		s.wp.resize(s.dim,1);
-		Eigen::MatrixXd wphi,wtheta, PLK,P_T;
-
-		// prepare the Gaussian base points and weights
-		gaussquad(0, PI, s.t, s.wt);	// generate the base points and weights for Gaussian quadrature
-		gaussquad(0, 2*PI, s.p, s.wp);	// generate the base points and weights for Gaussian quadrature
-		meshgrid(s.p, s.t, s.phi, s.theta);
-		meshgrid(s.wp, s.wt, wphi, wtheta);
-		reshape(wphi,wphi.rows()*wphi.cols(), 1);
-		reshape(wtheta,wtheta.rows()*wtheta.cols(), 1);
-		s.w = wphi.array() * wtheta.array();
-		// calculate the basis vectors and the derivatives and store them
-		ylk_cos_sin_bosh(s.L_max, s.phi, s.theta,s.YLK, PLK);
-		ylk_cos_sin_dphi_bosh(s.L_max, s.phi, s.theta, PLK, s.Y_P);
-		ylk_cos_sin_dphiphi_bosh(s.L_max, s.phi, s.theta, PLK, s.Y_PP);
-		ylk_cos_sin_dtheta_bosh(s.L_max, s.phi, s.theta, PLK, s.Y_T, P_T);
-		ylk_cos_sin_dthetaphi_bosh(s.L_max, s.phi, s.theta, PLK, P_T, s.Y_TP);
-		ylk_cos_sin_dthetatheta_bosh(s.L_max, s.phi, s.theta, P_T, s.Y_TT);
-
-		//cleanup
-		wphi.resize(0,0);
-		wtheta.resize(0,0);
-		PLK.resize(0,0);
-		P_T.resize(0,0);
-
-
-		//
-		return in;
-	};
-	
+    int dim;
+    int L_max;
+    //member variables for Gaussian quadrature
+    MatrixXd p,t,wt,wp;	// column matrices holding the GA
+    MatrixXd phi, theta,w;
+    MatrixXd YLK, Y_P, Y_T, Y_TT, Y_PP, Y_TP;
+    
+    // member variables for visualization only
+    //MatrixXd YLK_tri;
+    
+    // constructor
+    sh_basis(int arg1 = 6, int arg2 = 30)
+    {
+        //replicate the basis generation code in matlab
+        dim = arg2;
+        L_max = arg1;
+        t.resize(dim,1);
+        wt.resize(dim,1);
+        p.resize(dim,1);
+        wp.resize(dim,1);
+        Eigen::MatrixXd wphi,wtheta, PLK,P_T;
+        
+        // prepare the Gaussian base points and weights
+        gaussquad(0, PI, t, wt);	// generate the base points and weights for Gaussian quadrature
+        gaussquad(0, 2*PI, p, wp);	// generate the base points and weights for Gaussian quadrature
+        meshgrid(p, t, phi, theta);
+        meshgrid(wp, wt, wphi, wtheta);
+        reshape(wphi,wphi.rows()*wphi.cols(), 1);
+        reshape(wtheta,wtheta.rows()*wtheta.cols(), 1);
+        w = wphi.array() * wtheta.array();
+        // calculate the basis vectors and the derivatives and store them
+        ylk_cos_sin_bosh(L_max, phi, theta,YLK, PLK);
+        ylk_cos_sin_dphi_bosh(L_max, phi, theta, PLK, Y_P);
+        ylk_cos_sin_dphiphi_bosh(L_max, phi, theta, PLK, Y_PP);
+        ylk_cos_sin_dtheta_bosh(L_max, phi, theta, PLK, Y_T, P_T);
+        ylk_cos_sin_dthetaphi_bosh(L_max, phi, theta, PLK, P_T, Y_TP);
+        ylk_cos_sin_dthetatheta_bosh(L_max, phi, theta, P_T, Y_TT);
+        //cleanup
+        wphi.resize(0,0);
+        wtheta.resize(0,0);
+        PLK.resize(0,0);
+        P_T.resize(0,0);
+        
+    }
+    sh_basis(const sh_basis& that)		// copy constructor
+    {
+        //replicate the basis generation code in matlab
+        dim = that.dim;
+        L_max = that.L_max;
+        t.resize(dim,1);
+        wt.resize(dim,1);
+        p.resize(dim,1);
+        wp.resize(dim,1);
+        Eigen::MatrixXd wphi,wtheta, PLK,P_T;
+        
+        // prepare the Gaussian base points and weights
+        gaussquad(0, PI, t, wt);	// generate the base points and weights for Gaussian quadrature
+        gaussquad(0, 2*PI, p, wp);	// generate the base points and weights for Gaussian quadrature
+        meshgrid(p, t, phi, theta);
+        meshgrid(wp, wt, wphi, wtheta);
+        reshape(wphi,wphi.rows()*wphi.cols(), 1);
+        reshape(wtheta,wtheta.rows()*wtheta.cols(), 1);
+        w = wphi.array() * wtheta.array();
+        // calculate the basis vectors and the derivatives and store them
+        ylk_cos_sin_bosh(L_max, phi, theta,YLK, PLK);
+        ylk_cos_sin_dphi_bosh(L_max, phi, theta, PLK, Y_P);
+        ylk_cos_sin_dphiphi_bosh(L_max, phi, theta, PLK, Y_PP);
+        ylk_cos_sin_dtheta_bosh(L_max, phi, theta, PLK, Y_T, P_T);
+        ylk_cos_sin_dthetaphi_bosh(L_max, phi, theta, PLK, P_T, Y_TP);
+        ylk_cos_sin_dthetatheta_bosh(L_max, phi, theta, P_T, Y_TT);
+        
+        //cleanup
+        wphi.resize(0,0);
+        wtheta.resize(0,0);
+        PLK.resize(0,0);
+        P_T.resize(0,0);
+        
+    }
+    sh_basis& operator=(const sh_basis& that)	// copy assignment
+    {
+        this->dim = that.dim;
+        this->L_max = that.L_max;
+        t.resize(dim,1);
+        wt.resize(dim,1);
+        p.resize(dim,1);
+        wp.resize(dim,1);
+        Eigen::MatrixXd wphi,wtheta, PLK,P_T;
+        
+        // prepare the Gaussian base points and weights
+        gaussquad(0, PI, t, wt);	// generate the base points and weights for Gaussian quadrature
+        gaussquad(0, 2*PI, p, wp);	// generate the base points and weights for Gaussian quadrature
+        meshgrid(p, t, phi, theta);
+        meshgrid(wp, wt, wphi, wtheta);
+        reshape(wphi,wphi.rows()*wphi.cols(), 1);
+        reshape(wtheta,wtheta.rows()*wtheta.cols(), 1);
+        w = wphi.array() * wtheta.array();
+        // calculate the basis vectors and the derivatives, and store them
+        ylk_cos_sin_bosh(L_max, phi, theta,YLK, PLK);
+        ylk_cos_sin_dphi_bosh(L_max, phi, theta, PLK, Y_P);
+        ylk_cos_sin_dphiphi_bosh(L_max, phi, theta, PLK, Y_PP);
+        ylk_cos_sin_dtheta_bosh(L_max, phi, theta, PLK, Y_T, P_T);
+        ylk_cos_sin_dthetaphi_bosh(L_max, phi, theta, PLK, P_T, Y_TP);
+        ylk_cos_sin_dthetatheta_bosh(L_max, phi, theta, P_T, Y_TT);
+        
+        //cleanup
+        wphi.resize(0,0);
+        wtheta.resize(0,0);
+        PLK.resize(0,0);
+        P_T.resize(0,0);
+        return *this;
+    }
+    ~sh_basis()
+    {
+        p.resize(0,0);
+        t.resize(0,0);
+        wt.resize(0,0);
+        wp.resize(0,0);
+        phi.resize(0,0);
+        theta.resize(0,0);
+        w.resize(0,0);
+        YLK.resize(0,0);
+        Y_P.resize(0,0);
+        Y_T.resize(0,0);
+        Y_TT.resize(0,0);
+        Y_PP.resize(0,0);
+        Y_TP.resize(0,0);
+    };
+    
+public:
+    ostream& disp(ostream& os, const sh_basis& b)
+    {
+        /**/
+        os<<"L_max: "<<b.L_max<<std::endl;
+        os<<"dim  : "<<b.dim<<std::endl;
+        os<<"Dimensions: "<<std::endl;
+        os<<"			t: "<<b.t.rows()<<" x "<<b.t.cols()<<std::endl;
+        os<<"		theta: "<<b.theta.rows()<<" x "<<b.theta.cols()<<std::endl;
+        os<<"			p: "<<b.p.rows()<<" x "<<b.p.cols()<<std::endl;
+        os<<"		  phi: "<<b.phi.rows()<<" x "<<b.phi.cols()<<std::endl;
+        os<<"		   wt: "<<b.wt.rows()<<" x "<<b.wt.cols()<<std::endl;
+        os<<"		   wp: "<<b.wp.rows()<<" x "<<b.wp.cols()<<std::endl;
+        os<<"		    w: "<<b.w.rows()<<" x "<<b.w.cols()<<std::endl;
+        os<<"		   YLK: "<<b.YLK.rows()<<" x "<<b.YLK.cols()<<std::endl;
+        os<<"		   Y_P: "<<b.Y_P.rows()<<" x "<<b.Y_P.cols()<<std::endl;
+        os<<"		   Y_T: "<<b.Y_T.rows()<<" x "<<b.Y_T.cols()<<std::endl;
+        //os<<"	   YLK_tri: "<<b.YLK_tri.rows()<<" x "<<b.YLK_tri.cols()<<std::endl;
+        
+        return os;
+    };
+    friend ostream& operator<<(ostream& os, const sh_basis& s)
+    {
+        
+        os<<s.dim<<std::endl;
+        os<<s.L_max<<std::endl;
+        //
+        return os;
+    };
+    
+    
+    friend istream& operator>>(istream& in, sh_basis& s)
+    {
+        in>>s.dim;
+        in>>s.L_max;
+        // initialize accordingly
+        s.t.resize(s.dim,1);
+        s.wt.resize(s.dim,1);
+        s.p.resize(s.dim,1);
+        s.wp.resize(s.dim,1);
+        Eigen::MatrixXd wphi,wtheta, PLK,P_T;
+        
+        // prepare the Gaussian base points and weights
+        gaussquad(0, PI, s.t, s.wt);	// generate the base points and weights for Gaussian quadrature
+        gaussquad(0, 2*PI, s.p, s.wp);	// generate the base points and weights for Gaussian quadrature
+        meshgrid(s.p, s.t, s.phi, s.theta);
+        meshgrid(s.wp, s.wt, wphi, wtheta);
+        reshape(wphi,wphi.rows()*wphi.cols(), 1);
+        reshape(wtheta,wtheta.rows()*wtheta.cols(), 1);
+        s.w = wphi.array() * wtheta.array();
+        // calculate the basis vectors and the derivatives and store them
+        ylk_cos_sin_bosh(s.L_max, s.phi, s.theta,s.YLK, PLK);
+        ylk_cos_sin_dphi_bosh(s.L_max, s.phi, s.theta, PLK, s.Y_P);
+        ylk_cos_sin_dphiphi_bosh(s.L_max, s.phi, s.theta, PLK, s.Y_PP);
+        ylk_cos_sin_dtheta_bosh(s.L_max, s.phi, s.theta, PLK, s.Y_T, P_T);
+        ylk_cos_sin_dthetaphi_bosh(s.L_max, s.phi, s.theta, PLK, P_T, s.Y_TP);
+        ylk_cos_sin_dthetatheta_bosh(s.L_max, s.phi, s.theta, P_T, s.Y_TT);
+        
+        //cleanup
+        wphi.resize(0,0);
+        wtheta.resize(0,0);
+        PLK.resize(0,0);
+        P_T.resize(0,0);
+        
+        
+        //
+        return in;
+    };
+    
 };
 
-
-class shp_surface	// class depends on sh_basis. They both use the Bosh 2000 normalized spherical harmonics
+////////////////////////////////////////////////////////////////////////////////
+class shp_surface
+// class depends on spherical_mesh and sh_basis. uses Bosh
+// 2000 normalized spherical harmonics
+// Defines the actual surface with all scalar fields. It maintains an updated
+// triangular mesh (through spherical_mesh) only for self-intersection tests
+// and visualization (which usually --eg. vtk-- requires a surface tesselation). Also, since
+// surface properties can be calculated approximately on the triangular mesh
+// it comes in handy as a self-check and comparison with the analytical formula(for academic purposes).
+// shp_surface is able to: enforce symmetry, change L_max, rotate surface around itself,
+// calculate total mean and Gaussian curvature, surface area, volume, bending
+// energy and surface normals.
+//
 {
 public:
 	//member variables
@@ -3073,3 +3086,7 @@ friend istream& operator>>(istream& in, shp_shell& s)
 
 
 };
+
+
+
+//////////////////////////////////////////
