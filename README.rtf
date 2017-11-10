@@ -38,7 +38,7 @@ Important: "utility.h": You have to modify the first two lines to include the pa
 
 --------------------------------------------------------------------------------------------------------------
 
-Modification of shell class to use morphogen gradient-based determination of local preferred curvature:
+Modification of shp_shell class to use morphogen gradient-based determination of local preferred curvature:
 Modify the method "update_scalar_fields" lines --> comment out lines 2201 to 2235 and uncomment lines 2245 to 2253.
 
 
@@ -48,7 +48,7 @@ General information:
 spherical_mesh
 sh_basis
 shp_surface
-shp_shell  (under testing and being refactored ---- not needed for SHAPE)
+shp_shell
 
 ----------- to use these classes just "include" the file "shape_tools.h" in your application code.
 All function definitions are inline, so there is no need to link other files.
