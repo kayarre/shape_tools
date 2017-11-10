@@ -2093,18 +2093,23 @@ public:
 		{
 			//evaluate the gene expression fields and store them in sf1, sf2 and sf3 --- sosi: deal with index pointing to zero
 			MatrixXd ones;ones.resize(this->srf_g->b->YLK.rows(),1);ones.fill(1.0);
-			if (sfindx[0]>-1) {sf1 = this->srf_g->b->YLK*(srf_g->sfmx.col(this->sfindx[0]));sf1 = sf1.array()- (ones.array()* sf1.minCoeff());sf1 = sf1.array()/sf1.maxCoeff();}
+			if (sfindx[0]>-1) {sf1 = this->srf_g->b->YLK*(srf_g->sfmx.col(this->sfindx[0]));sf1 = sf1.array()- (ones.array()* sf1.minCoeff());sf1 = sf1.array() * 3/sf1.maxCoeff();}
 			if (sfindx[1]>-1) {sf2 = this->srf_g->b->YLK*(srf_g->sfmx.col(this->sfindx[1]));sf2 = sf2.array()-(ones.array()* sf2.minCoeff());sf2 = sf2.array()/sf2.maxCoeff();}
 			if (sfindx[2]>-1) {sf3 = this->srf_g->b->YLK*(srf_g->sfmx.col(this->sfindx[2]));sf3 = sf3.array()-(ones.array()* sf3.minCoeff());sf3 = sf3.array()/sf3.maxCoeff();}
 			if (sfindx[3]>-1) {sf1_2 = this->srf_g->b->YLK*(srf_g->sfmx.col(this->sfindx[3]));sf1_2 = sf1_2.array()-(ones.array()* sf1_2.minCoeff());sf1_2 = sf1_2.array()/sf1_2.maxCoeff();}
 			if (sfindx[4]>-1) {sf2_2 = this->srf_g->b->YLK*(srf_g->sfmx.col(this->sfindx[4]));sf2_2 = sf2_2.array()-(ones.array()* sf2_2.minCoeff());sf2_2 = sf2_2.array()/sf2_2.maxCoeff();}
 			if (sfindx[5]>-1) {sf3_2 = this->srf_g->b->YLK*(srf_g->sfmx.col(this->sfindx[5]));sf3_2 = sf3_2.array()-(ones.array()* sf3_2.minCoeff());sf3_2 = sf3_2.array()/sf3_2.maxCoeff();}
+            // /////////////////////////////////////////////////
 			// calculate relative effects of gene exression pattens
+            // for most simulations we only have one field determined by psnl, and
+            // psnl is generally set to 1.0. This means that facf then becomes equal to the
+            // morphogen gradient determined in sf1.
+            // /////////////////////////////////////////////////
 			MatrixXd facf, fones;
 			facf.resize(this->srf_g->b->YLK.rows(),1);
 			fones.resize(this->srf_g->b->YLK.rows(),1);fones.fill(1.0);
 			double lambda = 1.0;
-			if (sfindx[0] >-1 | sfindx[1] >-1 | sfindx[2] >-1)
+			if (sfindx[0] >-1 | sfindx[1] >-1 | sfindx[2] >-1)  // only execute this code if one of the expression fields is defined
 			{
 				facf.fill(1.0);
 				if (sfindx[0]>-1 & psnl!= 0.0){ 
@@ -2168,7 +2173,7 @@ public:
 				facf_2.fill(0.0);
 			}
 			
-			// initialize C_o according to the currrent model -- experiment with more options here!!
+			// initialize C_o according to the current model -- experiment with more options here!!
 			if(this->C_o_model==0){this->C_o.fill(0.0);}		// tendency to flat tissue
 			if(this->C_o_model==1){this->C_o = srf_u->H.array();} // tendency to follow the curvature of the egg
 			//this->C_o = srf_u->H.array();
@@ -2184,16 +2189,26 @@ public:
 			this->kb_eff.resize(facf.rows(), facf.cols());kb_eff.fill(this->miu);
 
 
-			double maxfacf = this->mp_cutoff*facf.maxCoeff();
-			double maxfacf_2 = this->mp_cutoff_2*facf_2.maxCoeff();
+			double maxfacf = this->mp_cutoff*facf.maxCoeff(); // sets a threshold for what is considered as active region
+            double maxfacf_2 = this->mp_cutoff_2*facf_2.maxCoeff();
+            
+            ////////////////////////////////////////////////////////////////////////////
+            ////////////// Note regarding accommodating morphogen gradients ////////////
+            ////////////////////////////////////////////////////////////////////////////
+			// comment out the     lines of code below to prevent thresholding of the //
+            // mesoderm primordium region into an active region that is binary.       //
+            ////////////////////////////////////////////////////////////////////////////
+            /**/
 			for(int ix=0;ix<facf.rows();ix++)
 			{
-				if(facf(ix,0)<=(maxfacf)){MP(ix,0) = 0.0;} else{MP(ix,0) = 1.0;}
+                
+                
+                if(facf(ix,0)<=(maxfacf)){MP(ix,0) = 0.0;} else{MP(ix,0) = 1.0;}
 				if(facf_2(ix,0)<=(maxfacf_2)){MP_2(ix,0) = 0.0;}else{MP_2(ix,0) = 1.0;}
 				
 				if(MP(ix,0)>0 & MP_2(ix,0)>0)
 				{
-					/////if(mp_co>mp_co_2){this->C_o(ix,0)= 0.5 * (mp_co + mp_co_2);} // use mean of the two co's -- experiment with different models
+					
 					if(mp_co>mp_co_2){this->C_o(ix,0)= this->C_o(ix,0) + (mp_co * facf(ix,0) + mp_co_2* facf_2(ix,0));} // add the effects of both
 					
 					// use average material properties
@@ -2217,7 +2232,27 @@ public:
 					kb_eff(ix,0) = this->kbMP_2;
 				}
 			}
+            
 
+            ////////////////////////////////////////////////////////////////////////////
+            ////////////// Note regarding accommodating morphogen gradients ////////////
+            ////////////////////////////////////////////////////////////////////////////
+            // uncomment  the lines of code below to use morphogenetic gradient for   //
+            // determining C_o,which depends on facf and C_o (the original undeformed)//
+            // this only works for one field sf1 with psnl = 1
+            ////////////////////////////////////////////////////////////////////////////
+            /*for(int ix=0;ix<facf.rows();ix++)
+            {
+
+                    //this->C_o(ix,0) = (1-facf(ix,0)) * this->C_o(ix,0)+ mp_co* facf(ix,0);
+                    this->C_o(ix,0) = this->C_o(ix,0)+ mp_co* facf(ix,0);
+                    miu_eff(ix,0) = this->miuMP;
+                    bulk_eff(ix,0) = this->bulkMP;
+                    kb_eff(ix,0) = this->kbMP;
+               
+            }
+            */
+            
 
 			// calculate the area fraction of the active region
 			this->active_area_fraction= double((this->srf_m->b->w.array()*this->srf_m->SSn.array()*this->MP.array()).sum())/this->srf_m->A;
